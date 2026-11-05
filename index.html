@@ -1,0 +1,939 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width,initial-scale=1" name="viewport" />
+    <meta content="#231F20" name="theme-color" />
+    <title>Sistemas Embarcados · ELF74</title>
+    <link href="style.css" rel="stylesheet" />
+    <link href="workbench.css" rel="stylesheet" />
+    <link href="board.css" rel="stylesheet" />
+    <link href="interrupts.css" rel="stylesheet" />
+    <link href="startup.css" rel="stylesheet" />
+    <link href="placa.css" rel="stylesheet" />
+    <link href="instalacao.css" rel="stylesheet" />
+    <link href="utfpr.css" rel="stylesheet" />
+  </head>
+  <body>
+    <header>
+      <div class="brand">
+        <img
+          class="utfpr-logo"
+          src="img/utfpr-horizontal-negativa.svg"
+          alt="UTFPR – Universidade Tecnológica Federal do Paraná"
+        />
+        <div class="brand-text">
+          <strong>Sistemas Embarcados</strong>
+          <small>ELF74 · Prof. Paulo Denis Garcez da Luz</small>
+        </div>
+      </div>
+      <nav>
+        <button class="nav active" id="benchBtn">Bancada</button>
+        <button class="nav" id="guideBtn">Guia &amp; cobertura</button>
+      </nav>
+      <div class="header-right">
+        <span class="localdot"> </span>
+        Executado no seu navegador
+        <span class="version"> v3.0 </span>
+      </div>
+    </header>
+    <main inert aria-busy="true">
+      <div class="intro">
+        <div>
+          <div class="eyebrow">UTFPR · DAELN · CÂMPUS CURITIBA / LABORATÓRIO VIRTUAL STM32 &amp; TIVA C</div>
+          <p>
+            Edite projetos, depure o Assembly e acompanhe os sinais de cada
+            microcontrolador.
+          </p>
+        </div>
+        <div class="engine">
+          <span class="dot amber" id="engineDot"> </span>
+          <div id="engineStatus">Carregando motores WebAssembly…</div>
+        </div>
+      </div>
+      <div class="toolbar">
+        <div class="toolgroup">
+          <label for="device"> Micro </label>
+          <select id="device">
+            <option value="stm32f411ce">ST · STM32F411CEU6</option>
+            <option value="stm32f103c8">ST · STM32F103C8T6</option>
+            <option value="stm32f407vg">ST · STM32F407VGT6</option>
+            <option value="tm4c123gh6pm">TI · TM4C123GH6PM</option>
+            <option value="tm4c1294ncpdt">TI · TM4C1294NCPDT</option>
+          </select>
+          <span class="sep"> </span>
+          <button class="primary" disabled="" id="assemble">
+            ◈ Build · F7
+          </button>
+          <button
+            disabled=""
+            id="buildFiles"
+            title="Faz o Build e gera os arquivos .bin e .hex do programa"
+          >
+            ↓ .bin + .hex
+          </button>
+          <button disabled="" id="run" title="Executar / pausar · F5">
+            ▶ Executar
+          </button>
+          <button
+            disabled=""
+            id="step"
+            title="Step Into · F11; blocos IT podem ser agrupados"
+          >
+            ↦ Passo
+          </button>
+          <button disabled="" id="stepOver" title="Passar por sub-rotina · F10">
+            ↷ Over
+          </button>
+          <button
+            disabled=""
+            id="stepOut"
+            title="Executar até retornar · Ctrl+F11"
+          >
+            ↗ Out
+          </button>
+          <button
+            disabled=""
+            id="runCursor"
+            title="Executar até a linha selecionada · Ctrl+F10"
+          >
+            ⇥ Cursor
+          </button>
+          <button disabled="" id="reset" title="Reiniciar CPU e captura">
+            ↺ Reset
+          </button>
+        </div>
+        <div class="toolgroup">
+          <label for="speed"> Ritmo </label>
+          <select id="speed">
+            <option value="1">30 passos/s</option>
+            <option selected="" value="10">300 passos/s</option>
+            <option value="100">3.000 passos/s</option>
+          </select>
+          <span id="ticks"> 0 passos </span>
+        </div>
+      </div>
+      <div class="statusbar">
+        <span id="status"> Inicializando… </span>
+        <span id="pcLabel"> PC — </span>
+      </div>
+      <div class="target-strip">
+        <div>
+          <span class="target-chip"> ▦ </span>
+          <strong id="targetName"> STM32F411CEU6 </strong>
+          <span id="targetSummary"> Carregando perfil… </span>
+        </div>
+        <button id="targetInfoBtn">Mapa do dispositivo ↗</button>
+      </div>
+      <div
+        class="workspace-tabs"
+        role="tablist"
+        aria-label="Áreas do laboratório"
+      >
+        <button
+          class="active"
+          id="tabBench"
+          role="tab"
+          aria-selected="true"
+          aria-controls="benchPanel"
+          data-workspace="bench"
+        >
+          ⌘ Programa &amp; sinais
+        </button>
+        <button
+          id="tabBoard"
+          role="tab"
+          aria-selected="false"
+          aria-controls="boardPanel"
+          data-workspace="board"
+        >
+          ▦ Chip &amp; conexões
+        </button>
+        <button
+          id="tabClocks"
+          role="tab"
+          aria-selected="false"
+          aria-controls="clockPanel"
+          data-workspace="clock"
+        >
+          ◷ Árvore de clock
+        </button>
+        <button
+          id="tabInterrupts"
+          role="tab"
+          aria-selected="false"
+          aria-controls="interruptsPanel"
+          data-workspace="interrupts"
+        >
+          ↯ Interrupções / NVIC
+        </button>
+        <button
+          id="tabStartup"
+          role="tab"
+          aria-selected="false"
+          aria-controls="startupPanel"
+          data-workspace="startup"
+        >
+          ⏻ Startup
+        </button>
+        <button
+          id="tabPlaca"
+          role="tab"
+          aria-selected="false"
+          aria-controls="placaPanel"
+          data-workspace="placa"
+        >
+          ⚡ Placa real
+        </button>
+        <button
+          id="tabInstalacao"
+          role="tab"
+          aria-selected="false"
+          aria-controls="instalacaoPanel"
+          data-workspace="instalacao"
+        >
+          ⚙ Instalação
+        </button>
+      </div>
+      <div id="benchPanel" role="tabpanel" aria-labelledby="tabBench">
+        <div class="workspace">
+          <section class="panel editor-panel">
+            <div class="panelhead">
+              <div>
+                <span class="num"> 01 </span>
+                Programa
+              </div>
+              <div class="mini-actions">
+                <button id="downloadAsm" title="Baixar Assembly">↓ .s</button>
+                <button
+                  id="importBtn"
+                  title="Abrir Assembly, binário ou projeto JSON"
+                >
+                  ↑ Abrir
+                </button>
+                <input
+                  accept=".s,.asm,.txt,.bin,.json"
+                  hidden=""
+                  id="importFile"
+                  type="file"
+                />
+              </div>
+            </div>
+            <div class="projectbar">
+              <div class="project-title">
+                <span> ▱ </span>
+                <input
+                  aria-label="Nome do projeto"
+                  id="projectName"
+                  value="Contador GPIO"
+                />
+                <button id="saveProject" title="Exportar projeto JSON">
+                  ↓ Projeto
+                </button>
+                <button id="newProject" title="Novo projeto">＋</button>
+              </div>
+              <div class="filetabs" id="fileTabs"></div>
+              <div class="file-actions">
+                <button id="addFile">＋ Arquivo</button>
+                <button id="renameFile">Renomear</button>
+                <button id="deleteFile">Excluir</button>
+                <label>
+                  Entrada
+                  <select
+                    aria-label="Arquivo de entrada"
+                    id="entryFile"
+                  ></select>
+                </label>
+              </div>
+            </div>
+            <div class="examplebar">
+              <select aria-label="Programa de exemplo" id="examples"></select>
+              <button id="loadExample" title="Carregar exemplo">
+                Carregar
+              </button>
+            </div>
+            <div class="tabbar">
+              <button class="tab active" data-code="source">Assembly</button>
+              <button class="tab" data-code="machine">
+                Código de máquina
+                <span id="byteCount"> </span>
+              </button>
+            </div>
+            <div class="editor-search">
+              <input
+                aria-label="Localizar no código"
+                id="findText"
+                placeholder="Localizar…"
+              />
+              <button id="findNext" title="Próxima ocorrência">↵</button>
+              <input
+                aria-label="Substituição"
+                id="replaceText"
+                placeholder="Substituir por…"
+              />
+              <button id="replaceOne">Trocar</button>
+              <button id="toggleSourceBp" title="Breakpoint na linha · F9">
+                ● BP
+              </button>
+            </div>
+            <div class="sourcewrap" id="sourcePane">
+              <div aria-hidden="true" id="lines"></div>
+              <textarea
+                aria-label="Editor Assembly"
+                autocapitalize="off"
+                autocomplete="off"
+                autocorrect="off"
+                id="source"
+                spellcheck="false"
+              ></textarea>
+            </div>
+            <div class="machinewrap" hidden="" id="machinePane">
+              <div class="hint">
+                Clique no endereço para alternar um breakpoint.
+              </div>
+              <div id="disasm"></div>
+            </div>
+            <label class="follow">
+              <input checked="" id="followPC" type="checkbox" />
+              Seguir PC
+              <span id="sourceLocation"> </span>
+            </label>
+            <div class="editorfoot">
+              <span id="sourceState"> Thumb-2 · sintaxe GNU </span>
+              <button id="downloadBin">↓ Binário</button>
+            </div>
+            <div class="example-description" id="exampleDescription"></div>
+          </section>
+          <section class="panel instruments">
+            <div class="panelhead">
+              <div>
+                <span class="num"> 02 </span>
+                Analisador lógico
+              </div>
+              <span class="badge" id="captureBadge"> Capturando </span>
+            </div>
+            <div class="scope-tools">
+              <label>
+                Janela
+                <select id="scopeWindow">
+                  <option value="128">128 passos</option>
+                  <option selected="" value="512">512 passos</option>
+                  <option value="2048">2.048 passos</option>
+                  <option value="8192">8.192 passos</option>
+                </select>
+              </label>
+              <button id="capture">❚❚ Congelar</button>
+              <button id="clearScope">Limpar</button>
+              <button id="exportCsv">↓ CSV</button>
+              <button id="exportVcd">↓ VCD</button>
+            </div>
+            <div class="scope-area">
+              <div id="channelLabels"></div>
+              <canvas
+                aria-label="Formas de onda digitais; clique para posicionar os cursores A e B"
+                id="scope"
+              >
+              </canvas>
+            </div>
+            <div class="scope-readout">
+              <span id="cursorReadout">
+                Clique no gráfico: cursores A / B
+              </span>
+              <span id="scopeRange"> 0 → 512 passos </span>
+            </div>
+            <div class="triggerbar">
+              <label>
+                Trigger
+                <select id="trigger">
+                  <option value="off">Livre</option>
+                  <option value="rise">↑ Subida CH1</option>
+                  <option value="fall">↓ Descida CH1</option>
+                </select>
+              </label>
+              <button id="armTrigger">Armar</button>
+              <span id="triggerStatus">
+                Tempo lógico · não são ciclos de clock
+              </span>
+            </div>
+            <div class="ports-head">
+              <strong> Portas digitais </strong>
+              <div class="segmented" id="portSelector"></div>
+            </div>
+            <div class="pin-legend">
+              <span>
+                <i class="in-dot"> </i>
+                Entrada: clique para alternar
+              </span>
+              <span>
+                <i class="out-dot"> </i>
+                Saída: definida pelo programa
+              </span>
+            </div>
+            <div class="pins" id="pins"></div>
+            <div class="port-values" id="portValues"></div>
+            <details class="stimulus">
+              <summary>
+                Gerador de entrada &amp; ligação virtual
+                <span> ⌄ </span>
+              </summary>
+              <div class="stimulus-body">
+                <label>
+                  <input id="genEnabled" type="checkbox" />
+                  Onda quadrada
+                </label>
+                <select aria-label="Pino do gerador" id="genPin"></select>
+                <label>
+                  Período
+                  <input
+                    id="genPeriod"
+                    max="100000"
+                    min="2"
+                    type="number"
+                    value="64"
+                  />
+                  passos
+                </label>
+                <label>
+                  Duty
+                  <input
+                    id="genDuty"
+                    max="100"
+                    min="0"
+                    type="number"
+                    value="50"
+                  />
+                  %
+                </label>
+                <div class="wire">
+                  <label>
+                    <input id="wireEnabled" type="checkbox" />
+                    Conectar
+                  </label>
+                  <select aria-label="Pino de origem" id="wireFrom"></select>
+                  <span> → </span>
+                  <select aria-label="Pino de destino" id="wireTo"></select>
+                </div>
+              </div>
+            </details>
+          </section>
+          <section class="panel registers">
+            <div class="panelhead">
+              <div>
+                <span class="num"> 03 </span>
+                CPU
+              </div>
+              <select aria-label="Formato dos registradores" id="regFormat">
+                <option value="hex">HEX</option>
+                <option value="unsigned">UINT</option>
+                <option value="signed">INT</option>
+              </select>
+            </div>
+            <div class="flags" id="flags"></div>
+            <div class="reg-heading">
+              <span> REGISTRADOR </span>
+              <span> VALOR · DUPLO CLIQUE PARA EDITAR </span>
+            </div>
+            <div id="regs"></div>
+            <details class="special">
+              <summary>Controle &amp; pilhas</summary>
+              <div id="specialRegs"></div>
+            </details>
+            <details class="special">
+              <summary>Ponto flutuante · S0–S31</summary>
+              <div id="fpuRegs"></div>
+            </details>
+            <div class="cpu-note">
+              Realce azul: valor alterado na última atualização.
+            </div>
+          </section>
+        </div>
+        <section class="panel bottom">
+          <div class="bottomtabs">
+            <button class="active" data-bottom="memory">
+              Memória &amp; pilhas
+            </button>
+            <button data-bottom="terminal">
+              Terminal serial
+              <span id="rxBadge"> </span>
+            </button>
+            <button data-bottom="events">Eventos</button>
+            <button data-bottom="debug">Watches &amp; breakpoints</button>
+            <button data-bottom="peripherals">Periféricos</button>
+            <button data-bottom="trace">Trace &amp; funções</button>
+            <button data-bottom="build">Build / comandos</button>
+            <span id="memorySummary"> Mapa do dispositivo selecionado </span>
+          </div>
+          <div class="bottomcontent" id="memoryPanel">
+            <aside class="memorymap" id="memoryMap"></aside>
+            <div class="memoryview">
+              <div class="mem-controls">
+                <label>
+                  Endereço
+                  <input
+                    id="memAddress"
+                    spellcheck="false"
+                    value="0x20000000"
+                  />
+                </label>
+                <button id="memGo">Ir</button>
+                <button id="memPrev">←</button>
+                <button id="memNext">→</button>
+                <span> Duplo clique em byte SRAM para editar </span>
+              </div>
+              <div class="hexview" id="hexView"></div>
+            </div>
+            <div class="stackview">
+              <div class="stackhead">
+                <h3>Pilha ↓</h3>
+                <select id="stackSelect">
+                  <option value="MSP">MSP</option>
+                  <option value="PSP">PSP</option>
+                </select>
+              </div>
+              <div id="stack"></div>
+              <small>
+                Palavras de 32 bits · little-endian
+                <br />
+                Seta marca o topo atual.
+              </small>
+            </div>
+          </div>
+          <div class="bottomcontent terminal" hidden="" id="terminalPanel">
+            <div class="terminaltop">
+              <span> UART virtual · RXNE / TXE · transferência por byte </span>
+              <button id="clearTerminal">Limpar saída</button>
+            </div>
+            <pre aria-live="polite" id="terminalOutput"></pre>
+            <form id="serialForm">
+              <span> RX → </span>
+              <input
+                aria-label="Entrada serial"
+                id="serialInput"
+                placeholder="Digite os dados recebidos pelo programa…"
+              />
+              <select id="lineEnding">
+                <option value="none">Sem final</option>
+                <option value="lf">LF</option>
+                <option value="crlf">CR + LF</option>
+              </select>
+              <button class="primary" type="submit">Enviar</button>
+            </form>
+            <small>
+              Use o exemplo 03 e clique Executar. SR: 0x40004400 · DR:
+              0x40004404. Não simula temporização elétrica de UART.
+            </small>
+          </div>
+          <div class="bottomcontent" hidden="" id="eventsPanel">
+            <div id="eventLog"></div>
+          </div>
+          <div class="bottomcontent debugger-grid" hidden="" id="debugPanel">
+            <div class="watch-section">
+              <h3>Watch expressions</h3>
+              <form class="inlineform" id="watchForm">
+                <input
+                  aria-label="Expressão watch"
+                  id="watchExpr"
+                  placeholder="R0, mem32(GPIOA_ODR)…"
+                />
+                <button>＋</button>
+              </form>
+              <div class="data-table" id="watchList"></div>
+              <small>
+                Registradores, símbolos, operadores e mem8 / mem16 / mem32.
+              </small>
+            </div>
+            <div class="break-section">
+              <h3>Breakpoints condicionais</h3>
+              <form class="breakform" id="bpForm">
+                <input
+                  aria-label="Endereço do breakpoint"
+                  id="bpAddress"
+                  placeholder="Endereço ou símbolo"
+                />
+                <input
+                  aria-label="Condição do breakpoint"
+                  id="bpCondition"
+                  placeholder="Condição: R0 == 5"
+                />
+                <input
+                  id="bpHits"
+                  min="1"
+                  title="Parar no N-ésimo encontro"
+                  type="number"
+                  value="1"
+                />
+                <button>＋ BP</button>
+              </form>
+              <div id="breakList"></div>
+            </div>
+            <div class="data-break-section">
+              <h3>Data watchpoints</h3>
+              <form class="breakform" id="dataBpForm">
+                <input
+                  aria-label="Endereço do watchpoint"
+                  id="dataAddress"
+                  placeholder="Endereço ou símbolo"
+                />
+                <select aria-label="Tipo de acesso" id="dataAccess">
+                  <option value="write">Escrita</option>
+                  <option value="read">Leitura</option>
+                  <option value="access">Ambos</option>
+                </select>
+                <select aria-label="Tamanho do watchpoint" id="dataSize">
+                  <option value="1">1 byte</option>
+                  <option value="2">2 bytes</option>
+                  <option selected="" value="4">4 bytes</option>
+                </select>
+                <button>＋ Data</button>
+              </form>
+              <div id="dataBreakList"></div>
+              <small>
+                Interrompe após o passo que acessa a faixa observada.
+              </small>
+            </div>
+          </div>
+          <div
+            class="bottomcontent peripheral-panel"
+            hidden=""
+            id="peripheralsPanel"
+          >
+            <div class="peripheral-toolbar">
+              <h3>System viewer · GPIO</h3>
+              <select
+                aria-label="Porta do inspetor"
+                id="peripheralPort"
+              ></select>
+              <span id="peripheralBase"> </span>
+              <span> Duplo clique no valor para editar </span>
+            </div>
+            <div id="peripheralRegisters"></div>
+            <div class="peripheral-note" id="pinoutLegend"></div>
+          </div>
+          <div class="bottomcontent trace-grid" hidden="" id="tracePanel">
+            <section>
+              <h3>
+                Call stack
+                <span> rastreado desde o reset </span>
+              </h3>
+              <div id="callStack"></div>
+              <h3>Cobertura de execução</h3>
+              <div id="coverageSummary"></div>
+              <div id="coverageList"></div>
+            </section>
+            <section>
+              <div class="tracehead">
+                <h3>Trace de instruções</h3>
+                <button id="exportTrace">↓ CSV</button>
+              </div>
+              <div id="instructionTrace"></div>
+            </section>
+          </div>
+          <div class="bottomcontent build-grid" hidden="" id="buildPanel">
+            <section>
+              <div class="tracehead">
+                <h3>Build output</h3>
+                <button id="exportHex">↓ Intel HEX</button>
+              </div>
+              <pre id="buildOutput">Aguardando montagem…</pre>
+            </section>
+            <section>
+              <h3>Janela de comandos</h3>
+              <pre id="commandOutput">
+Comandos: help, regs, print R0, mem endereço [bytes], set R0 valor, break endereço, step, over, out, run, stop, reset.</pre
+              >
+              <form class="inlineform" id="commandForm">
+                <span> › </span>
+                <input
+                  aria-label="Comando de depuração"
+                  id="commandInput"
+                  placeholder="print mem32(0x20000000)"
+                />
+                <button>Executar</button>
+              </form>
+            </section>
+          </div>
+        </section>
+      </div>
+      <section
+        id="boardPanel"
+        class="workbench-panel"
+        role="tabpanel"
+        aria-labelledby="tabBoard"
+        hidden
+      ></section>
+      <section
+        id="clockPanel"
+        class="workbench-panel"
+        role="tabpanel"
+        aria-labelledby="tabClocks"
+        hidden
+      ></section>
+      <section
+        id="interruptsPanel"
+        class="workbench-panel"
+        role="tabpanel"
+        aria-labelledby="tabInterrupts"
+        hidden
+      ></section>
+      <section
+        id="startupPanel"
+        class="workbench-panel"
+        role="tabpanel"
+        aria-labelledby="tabStartup"
+        hidden
+      ></section>
+      <section
+        id="placaPanel"
+        class="workbench-panel"
+        role="tabpanel"
+        aria-labelledby="tabPlaca"
+        hidden
+      ></section>
+      <section
+        id="instalacaoPanel"
+        class="workbench-panel"
+        role="tabpanel"
+        aria-labelledby="tabInstalacao"
+        hidden
+      ></section>
+      <footer>
+        <span>
+          Projeto salvo neste navegador · execução local em WebAssembly
+        </span>
+        <button id="coverageBtn">Cobertura e limitações ↗</button>
+        <a href="THIRD_PARTY.md" target="_blank"> Licenças &amp; fontes </a>
+        <span>
+          Projeto de aluno para a disciplina ELF74 – não é um site oficial da UTFPR ·
+          software livre (GPL-2.0-or-later)
+        </span>
+      </footer>
+    </main>
+    <dialog id="guide">
+      <div class="dialoghead">
+        <div>
+          <div class="eyebrow">SISTEMAS EMBARCADOS / GUIA RÁPIDO</div>
+          <h2>Uma bancada para explorar.</h2>
+        </div>
+        <button aria-label="Fechar" id="closeGuide">✕</button>
+      </div>
+      <div class="guidebody">
+        <h3>Fluxo de trabalho</h3>
+        <ol>
+          <li>
+            Selecione o microcontrolador e carregue um exemplo adaptado ao
+            perfil.
+          </li>
+          <li>
+            Edite main.s; adicione arquivos e inclua-os com
+            <code> .include "rotinas.s" </code>
+            . Entrada define o arquivo raiz.
+          </li>
+          <li>
+            <b> Build F7 </b>
+            ,
+            <b> Run F5 </b>
+            ,
+            <b> Into F11 </b>
+            ,
+            <b> Over F10 </b>
+            ,
+            <b> Out Ctrl+F11 </b>
+            ,
+            <b> Cursor Ctrl+F10 </b>
+            .
+          </li>
+          <li>
+            F9 ou clique no número da linha alterna um breakpoint. As abas
+            inferiores reúnem watches, periféricos, memória, trace e comandos.
+          </li>
+        </ol>
+        <h3>Recursos inspirados no µVision 5</h3>
+        <table>
+          <tr>
+            <th>Recurso</th>
+            <th>Nesta versão web</th>
+          </tr>
+          <tr>
+            <td>Projetos e arquivos</td>
+            <td>
+              Assembly, .include, arquivo de entrada, persistência local,
+              importação/exportação JSON.
+            </td>
+          </tr>
+          <tr>
+            <td>Editor e build</td>
+            <td>
+              Busca/substituição, fonte e símbolos quando verificáveis,
+              diagnóstico de montagem, binário e Intel HEX.
+            </td>
+          </tr>
+          <tr>
+            <td>Debugger</td>
+            <td>
+              Into/Over/Out, run-to-cursor, breakpoints condicionais/contagem,
+              data watchpoints.
+            </td>
+          </tr>
+          <tr>
+            <td>Watches e comandos</td>
+            <td>
+              Expressões de registradores/símbolos, mem8/16/32, inspeção e
+              alteração da memória/CPU.
+            </td>
+          </tr>
+          <tr>
+            <td>Call stack, trace, coverage</td>
+            <td>
+              Chamadas observadas desde o reset, passos rastreados, contagem por
+              endereço. Sem DWARF/variáveis locais C.
+            </td>
+          </tr>
+          <tr>
+            <td>System viewer e I/O</td>
+            <td>
+              Registradores GPIO, pinos do encapsulamento, terminal, scope,
+              gerador e ligação virtual.
+            </td>
+          </tr>
+          <tr>
+            <td>Toolchain/hardware Keil</td>
+            <td>
+              Compiladores proprietários C/C++, .uvprojx, ELF/DWARF, gravação
+              Flash e debug JTAG/SWD não incluídos.
+            </td>
+          </tr>
+        </table>
+        <h3>Perfis de dispositivos</h3>
+        <div id="deviceGuideTable"></div>
+        <p>
+          O perfil define CPU, Flash/SRAM, bases GPIO e pinos disponíveis. O
+          desenho do chip mostra a pinagem física em vista superior. Conecte
+          botões, chaves e LEDs virtuais; isso não representa o circuito de uma
+          placa de desenvolvimento comercial.
+        </p>
+        <h3>Precisão e limites</h3>
+        <p>
+          Keystone monta, Unicorn executa bytes reais Thumb/Thumb-2 e Capstone
+          desmonta. A CPU muda entre Cortex-M3 e M4; a FPU do M4 começa
+          habilitada.
+          <b>
+            Não é uma reprodução integral do Keil, do microcontrolador nem uma
+            certificação de toda a ISA.
+          </b>
+        </p>
+        <p>
+          NVIC/SCB modelam enable, pending, prioridade, máscaras e
+          entrada/retorno com frame básico de exceção. SysTick conta passos
+          lógicos. Não há empilhamento estendido da FPU, lazy stacking,
+          tail-chaining ou precisão de ciclos. IRQs externas são linhas
+          genéricas; a ligação GPIO → IRQ é virtual, sem registradores EXTI do
+          fabricante. MPU, DMA, ADC e timers dos fabricantes ainda não são
+          modelados.
+        </p>
+        <p>
+          Tempo do scope em
+          <b> passos do motor </b>
+          . Blocos IT podem ser agrupados; passo e breakpoint internos não
+          garantem granularidade por instrução. Call stack é reconstruído das
+          chamadas observadas e pode ficar incompleto após saltos/edições
+          manuais da CPU.
+        </p>
+        <p>
+          Captura de até 20.000 amostras. Congelar preserva os sinais; roda do
+          mouse percorre o histórico congelado. Clique para cursores A/B.
+          Trigger em CH1 congela após 64 passos. CSV usa índice de passo; VCD
+          usa 1 ns artificial por passo, sem significado físico.
+        </p>
+        <h3>Chip, clocks e interrupções</h3>
+        <p>
+          Em Chip &amp; conexões, selecione um terminal, escolha entrada/saída e
+          conecte um componente. Botão + LED carrega o exemplo PB0 → PA0. As
+          configurações iniciais são reaplicadas após Build/Reset; o Assembly
+          pode substituí-las. Pulls são armazenados, enquanto botões/chaves
+          dirigem explicitamente os níveis 0/1.
+        </p>
+        <p>
+          A árvore de clock calcula fontes, PLL e divisores e verifica limites
+          nominais. É um planejador salvo no projeto: não escreve RCC/SYSCTL,
+          não altera o ritmo de execução e não converte passos em tempo físico.
+        </p>
+        <p>
+          Na aba NVIC, Carregar exemplo IRQ0 configura um vetor na SRAM. Execute
+          o programa e dispare IRQ0, ou ligue um botão PB0 à IRQ0 na borda de
+          subida. O handler alterna PA0 e incrementa SRAM+0x100. BKPT, usado
+          pelo exemplo 04, é uma parada de depuração intencional.
+        </p>
+        <h3>Assembly e projetos</h3>
+        <p>
+          Sintaxe GNU Thumb (não ARMASM proprietário). Arquivos reunidos por
+          .include, sem linker C/C++. Binário bruto inicia na base Flash, sem
+          boot automático pela tabela de vetores. O NVIC pode consultar VTOR
+          durante interrupções. Intel HEX exporta endereços/bytes; não indica
+          firmware pronto para gravar.
+        </p>
+        <p>
+          Somente mapas de fonte verificados são utilizados. Caso uma diretiva
+          impeça metadados confiáveis, use a desmontagem. Watches suportam
+          operadores e mem8/16/32, não estruturas C. Projeto e fonte ficam no
+          navegador; exporte JSON para fazer uma cópia. Selecionar outro
+          dispositivo preserva seus arquivos e exige rebuild; os endereços do
+          código não são traduzidos automaticamente.
+        </p>
+        <h3>Referências oficiais</h3>
+        <div id="referenceLinks"></div>
+      </div>
+    </dialog>
+    <dialog id="editDialog">
+      <form id="editForm">
+        <h3 id="editTitle">Editar valor</h3>
+        <input autocomplete="off" id="editValue" spellcheck="false" />
+        <p>Use decimal ou prefixo 0x para hexadecimal.</p>
+        <div>
+          <button id="editCancel" type="button">Cancelar</button>
+          <button class="primary" type="submit">Aplicar</button>
+        </div>
+      </form>
+    </dialog>
+    <dialog id="fileDialog">
+      <form id="fileForm">
+        <h3 id="fileDialogTitle">Novo arquivo</h3>
+        <input
+          aria-label="Nome do arquivo"
+          id="fileNameInput"
+          placeholder="rotinas.s"
+          required=""
+        />
+        <p id="fileDialogHelp">
+          Arquivos locais incluídos com .include "rotinas.s".
+        </p>
+        <div>
+          <button id="fileCancel" type="button">Cancelar</button>
+          <button class="primary" type="submit">Salvar</button>
+        </div>
+      </form>
+    </dialog>
+    <script src="vendor/unicorn_arm.js"></script>
+    <script src="vendor/keystone.js"></script>
+    <script src="vendor/capstone.js"></script>
+    <script src="devices.js"></script>
+    <script src="nvic.js"></script>
+    <script src="core.js"></script>
+    <script src="examples.js"></script>
+    <script src="debugger.js"></script>
+    <script src="project.js"></script>
+    <script src="pinouts.js"></script>
+    <script src="clocks.js"></script>
+    <script src="clock-ui.js"></script>
+    <script src="board.js"></script>
+    <script src="interrupts-ui.js"></script>
+    <script src="zip.js"></script>
+    <script src="startups.js"></script>
+    <script src="startup-ui.js"></script>
+    <script src="placa-icdi.js"></script>
+    <script src="placa-cdc.js"></script>
+    <script src="placa-imagem.js"></script>
+    <script src="placa-ui.js"></script>
+    <script src="instalacao-ui.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>

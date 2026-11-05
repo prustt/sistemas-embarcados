@@ -1,0 +1,251 @@
+.placa-badge.off {
+  border-color: var(--line);
+  color: var(--muted);
+  background: #f4f6f9;
+}
+.placa-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+#placaPanel button:disabled {
+  cursor: not-allowed;
+}
+.placa-row button.active {
+  background: #e9f3ff;
+  color: #1d66b7;
+}
+.placa-info {
+  color: var(--muted);
+  font: 11px var(--mono);
+  min-width: 0;
+}
+.placa-progress {
+  width: 160px;
+  max-width: 100%;
+}
+.placa-state {
+  font: 11px var(--mono);
+  padding: 5px 9px;
+  border-radius: 20px;
+  background: #f4f6f9;
+  color: var(--muted);
+}
+.placa-state.running {
+  background: #effaf6;
+  color: #168775;
+}
+.placa-state.halted {
+  background: #fff6e8;
+  color: #a5620c;
+}
+.placa-status {
+  min-height: 18px;
+  margin-bottom: 12px;
+  font-size: 12px;
+  color: #0b8b72;
+}
+.placa-status.error {
+  color: #bf4646;
+}
+.placa-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr));
+  gap: 14px;
+}
+.placa-card {
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 12px 14px;
+  min-width: 0;
+}
+.placa-card h3 {
+  margin: 0 0 10px;
+  font-size: 12px;
+  color: var(--ink);
+}
+.placa-serial {
+  grid-column: 1 / -1;
+}
+.placa-pins {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.placa-pin {
+  display: grid;
+  grid-template-columns: auto auto;
+  align-items: center;
+  column-gap: 7px;
+  padding: 7px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 12px;
+}
+.placa-pin small {
+  grid-column: 2;
+  color: var(--muted);
+  font: 10px var(--mono);
+}
+.placa-pin .dot {
+  grid-row: span 2;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #d5dde7;
+}
+.placa-pin.led.on .dot {
+  background: #21cf6a;
+  box-shadow: 0 0 8px #21cf6a;
+}
+.placa-pin.button.on .dot {
+  background: #236ce4;
+}
+.placa-ports {
+  display: grid;
+  gap: 6px;
+}
+.placa-port {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  font-size: 11px;
+}
+.placa-port strong {
+  width: 54px;
+}
+.placa-port small {
+  color: var(--muted);
+  font: 10px var(--mono);
+}
+.placa-bits {
+  display: flex;
+  gap: 3px;
+}
+.placa-bits .bit {
+  width: 18px;
+  text-align: center;
+  font: 10px/18px var(--mono);
+  border-radius: 3px;
+  background: #f0f4f8;
+  color: var(--muted);
+}
+.placa-bits .bit.high {
+  background: #dff6ec;
+  color: #0b8b72;
+}
+.placa-bits .bit.out {
+  outline: 1px solid #9cc3f0;
+}
+.placa-bits .bit.none {
+  background: none;
+}
+.placa-regs {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  gap: 4px 10px;
+  margin-bottom: 12px;
+}
+.placa-reg {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+}
+.placa-reg code,
+.placa-watch code {
+  font: 11px var(--mono);
+}
+.placa-empty {
+  margin: 0 0 8px;
+  color: var(--muted);
+  font-size: 11px;
+}
+.placa-watch-form,
+.placa-send {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.placa-watch-form input,
+.placa-send input {
+  flex: 1;
+  min-width: 0;
+}
+.placa-watch {
+  display: grid;
+  grid-template-columns: 1fr auto auto auto;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  padding: 3px 0;
+}
+.placa-watch small {
+  color: var(--muted);
+  font: 10px var(--mono);
+}
+.placa-watch code.error {
+  color: #bf4646;
+}
+.placa-watch button {
+  padding: 2px 6px;
+  font-size: 10px;
+}
+.placa-serial-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.placa-serial-head h3 {
+  margin: 0 auto 0 0;
+}
+.placa-terminal {
+  margin: 0 0 8px;
+  height: 200px;
+  overflow: auto;
+  padding: 10px 12px;
+  border-radius: 6px;
+  background: var(--dark);
+  color: #d1deef;
+  font: 11px/1.5 var(--mono);
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+/* celular */
+@media (max-width: 640px) {
+  #placaPanel.workbench-panel {
+    padding: 14px;
+  }
+  .placa-row button {
+    flex: 1 1 auto;
+    min-height: 42px;
+  }
+  .placa-progress,
+  .placa-info,
+  .placa-state {
+    flex-basis: 100%;
+    width: 100%;
+  }
+  .placa-serial-head select,
+  .placa-serial-head button,
+  .placa-send button,
+  .placa-send select {
+    min-height: 40px;
+  }
+  .placa-send {
+    flex-wrap: wrap;
+  }
+  .placa-send input {
+    flex-basis: 100%;
+    min-height: 40px;
+  }
+  .placa-terminal {
+    height: 45vh;
+  }
+}

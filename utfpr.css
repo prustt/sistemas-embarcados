@@ -1,0 +1,228 @@
+/* Tema UTFPR: amarelo #FBCA07 e preto #231F20 (cores da marca oficial).
+   Carregado depois dos outros CSS; só troca cores e o header originais. */
+:root {
+  --utfpr-amarelo: #fbca07;
+  --utfpr-preto: #231f20;
+  --amarelo-claro: #f3e2a0;
+  --bg: #c9c5bd;
+  --panel: #e8e5df;
+  --panel-2: #dcd8d0;
+  --campo: #f2f0eb;
+  --ink: #231f20;
+  --muted: #5a554d;
+  --line: #b9b3a8;
+  --blue: #231f20;
+  --cyan: #fbca07;
+  --dark: #1f1b1c;
+  --dark-2: #2b2627;
+}
+
+/* header */
+header {
+  height: auto;
+  min-height: 72px;
+  padding: 10px 30px;
+  gap: 40px;
+  background: var(--utfpr-preto);
+  border-bottom: 4px solid var(--utfpr-amarelo);
+  color: #e8e4dc;
+}
+.brand {
+  gap: 16px;
+  letter-spacing: normal;
+}
+.utfpr-logo {
+  display: block;
+  height: 40px;
+  width: auto;
+}
+.brand-text {
+  display: flex;
+  flex-direction: column;
+  padding-left: 16px;
+  border-left: 1px solid #4a4446;
+}
+.brand-text strong {
+  font-size: 20px;
+  font-weight: 650;
+  letter-spacing: -0.3px;
+  color: #fff;
+}
+.brand-text small {
+  margin-top: 3px;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.2px;
+  color: #cfc9be;
+}
+.nav {
+  color: #cfc9be;
+}
+.nav.active {
+  color: #fff;
+  border-bottom: 3px solid var(--utfpr-amarelo);
+}
+.nav:hover {
+  color: #fff;
+}
+.header-right {
+  color: #b9b2a6;
+}
+.version {
+  border-color: #4a4446;
+}
+.localdot {
+  background: var(--utfpr-amarelo);
+}
+
+/* superfícies mais escuras que o branco original */
+button,
+.engine,
+.toolbar,
+.panel,
+.workspace-tabs,
+.workbench-panel,
+.board-panel,
+.irq-card,
+.segmented button.active {
+  background: var(--panel);
+}
+select,
+input {
+  background: var(--campo);
+}
+.examplebar,
+.scope-tools,
+.memorymap,
+.stackview,
+.projectbar,
+.irq-panel,
+.irq-note,
+.startup-file,
+.segmented,
+.board-level-pill,
+.placa-badge.off,
+.placa-state,
+.placa-bits .bit {
+  background: var(--panel-2);
+}
+
+/* destaque e seleção em amarelo */
+button:hover {
+  background: var(--amarelo-claro);
+  border-color: #c9a300;
+}
+button.primary {
+  background: var(--utfpr-amarelo);
+  color: var(--utfpr-preto);
+  border-color: #d4a900;
+}
+button.primary:hover {
+  background: #f0bd00;
+}
+.workspace-tabs button.active,
+.placa-row button.active,
+.regrow.changed,
+.stackrow.top,
+.callframe,
+.irq-badge,
+.irq-table tr.selected td {
+  background: var(--amarelo-claro);
+  color: var(--utfpr-preto);
+}
+.workspace-tabs button.active {
+  box-shadow: inset 0 -3px 0 var(--utfpr-amarelo);
+}
+.segmented button.active {
+  background: var(--utfpr-amarelo);
+  color: var(--utfpr-preto);
+}
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline-color: var(--utfpr-preto);
+}
+
+/* editor, terminal e osciloscópio no preto da marca */
+.tabbar,
+.sourcewrap,
+.sourcewrap pre,
+textarea#source,
+.machinewrap,
+#terminalOutput,
+.sourcewrap #lines,
+.build-grid pre,
+.irq-statline code,
+.irq-events {
+  background: var(--dark);
+}
+.editorfoot,
+.follow {
+  background: var(--dark-2);
+}
+.scope-area,
+.scope-readout,
+.board-viewport {
+  background: #1b1718;
+}
+
+/* textos que eram cinza-azulados sobre branco */
+.eyebrow {
+  color: var(--muted);
+}
+.intro p {
+  color: #4a453e;
+}
+footer {
+  color: #4a453e;
+}
+footer button,
+footer a {
+  color: var(--utfpr-preto);
+  text-decoration: underline;
+}
+
+@media (max-width: 760px) {
+  header {
+    flex-wrap: wrap;
+    gap: 8px 16px;
+    padding: 10px 16px;
+  }
+  .utfpr-logo {
+    height: 30px;
+  }
+  .brand-text {
+    padding-left: 12px;
+  }
+  .brand-text strong {
+    font-size: 17px;
+  }
+  .brand-text small {
+    font-size: 10px;
+  }
+  .header-right {
+    display: none;
+  }
+  nav {
+    order: 3;
+    width: 100%;
+    height: auto;
+  }
+  .nav {
+    padding: 8px 4px;
+  }
+}
+
+/* faixa do micro selecionado */
+.target-strip {
+  background: var(--panel);
+  border-color: var(--line);
+}
+.target-chip,
+.target-strip strong {
+  color: var(--utfpr-preto);
+}
+.target-strip #targetSummary {
+  color: var(--muted);
+}

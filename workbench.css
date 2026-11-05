@@ -1,0 +1,261 @@
+.workspace-tabs {
+  display: flex;
+  gap: 6px;
+  padding: 6px;
+  margin: 16px 0;
+  border: 1px solid #dce5ee;
+  background: #fff;
+  border-radius: 10px;
+  overflow-x: auto;
+}
+.workspace-tabs button {
+  padding: 11px 18px;
+  border: 0;
+  box-shadow: none;
+  background: transparent;
+  color: #667b91;
+  white-space: nowrap;
+  font-size: 12px;
+}
+.workspace-tabs button.active {
+  background: #e9f3ff;
+  color: #1d66b7;
+  font-weight: 700;
+}
+.workbench-panel {
+  background: #fff;
+  border: 1px solid #dce5ee;
+  border-radius: 12px;
+  padding: 24px;
+  min-height: 500px;
+}
+.workbench-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 20px;
+}
+.workbench-heading h2 {
+  margin: 7px 0;
+  font-size: 23px;
+  letter-spacing: -0.5px;
+  color: #142b45;
+}
+.workbench-heading p {
+  color: #657b91;
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.workbench-badge {
+  border: 1px solid #cce8df;
+  color: #168775;
+  background: #effaf6;
+  border-radius: 24px;
+  padding: 8px 13px;
+  font-size: 11px;
+  white-space: nowrap;
+}
+.clock-notice {
+  margin: 0 0 20px;
+  border-left: 3px solid #56a0df;
+  background: #f0f6fd;
+  padding: 12px 15px;
+  color: #526e8a;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.clock-layout {
+  display: grid;
+  grid-template-columns: 290px minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+.clock-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.clock-controls fieldset {
+  border: 1px solid #e1e8ee;
+  border-radius: 9px;
+  padding: 14px;
+  margin: 0;
+  display: grid;
+  gap: 12px;
+}
+.clock-controls legend {
+  font-weight: 650;
+  color: #415c77;
+  font-size: 11px;
+  padding: 0 6px;
+}
+.clock-field {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 110px;
+  gap: 7px;
+  align-items: center;
+  font-size: 11px;
+  color: #45617b;
+}
+.clock-field input,
+.clock-field select {
+  width: 100%;
+  min-width: 0;
+  height: 33px;
+  font: 12px var(--mono, monospace);
+}
+.clock-field small {
+  grid-column: 2;
+  color: #8b9cac;
+  font-size: 10px;
+}
+.clock-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.clock-actions button {
+  padding: 10px 12px;
+}
+.clock-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.clock-metric {
+  background: #f3f7fc;
+  padding: 15px;
+  border: 1px solid #e2eaf4;
+  border-radius: 9px;
+}
+.clock-metric span {
+  display: block;
+  color: #7390aa;
+  font-size: 10px;
+  letter-spacing: 1px;
+}
+.clock-metric strong {
+  display: block;
+  color: #1d5685;
+  font: 600 19px var(--mono, monospace);
+  margin-top: 7px;
+}
+.clock-graph {
+  background: #0f1e30;
+  border-radius: 12px;
+  padding: 15px;
+  overflow-x: auto;
+  min-height: 280px;
+}
+.clock-graph svg {
+  width: 100%;
+  min-width: 780px;
+  display: block;
+}
+.clock-wire {
+  stroke: #3bbda7;
+  stroke-width: 2;
+  fill: none;
+}
+.clock-node rect {
+  fill: #192f46;
+  stroke: #36536a;
+  stroke-width: 1;
+}
+.clock-node-label {
+  fill: #c2d4e4;
+  font:
+    10px system-ui,
+    sans-serif;
+}
+.clock-node-hz {
+  fill: #60ddc3;
+  font: 600 17px monospace;
+}
+.clock-node-formula {
+  fill: #7f9bb2;
+  font: 9px monospace;
+}
+.clock-graph .inactive {
+  opacity: 0.45;
+}
+.clock-status {
+  font-size: 12px;
+  padding: 13px 0;
+  line-height: 1.6;
+}
+.clock-status.valid {
+  color: #0b8b72;
+}
+.clock-status.invalid {
+  color: #bf4646;
+}
+.clock-validation p {
+  font-size: 11px;
+  line-height: 1.6;
+  margin: 5px 0;
+}
+.clock-warning {
+  color: #a46c1c;
+}
+.clock-note {
+  color: #72869b;
+}
+.clock-references {
+  display: flex;
+  gap: 15px;
+  flex-wrap: wrap;
+  padding-top: 15px;
+  font-size: 11px;
+}
+@media (max-width: 1000px) {
+  .clock-layout {
+    grid-template-columns: 1fr;
+  }
+  .clock-controls {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .clock-actions {
+    grid-column: 1/-1;
+  }
+  .workbench-panel {
+    padding: 16px;
+  }
+}
+@media (max-width: 600px) {
+  .workbench-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .clock-controls {
+    grid-template-columns: 1fr;
+  }
+  .clock-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .workspace-tabs button {
+    padding: 10px;
+  }
+  .clock-metric strong {
+    font-size: 16px;
+  }
+}
+
+.clock-preset {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  font-size: 11px;
+  color: #45617b;
+}
+.clock-preset select {
+  height: 36px;
+  width: 100%;
+}
+.clock-field[hidden] {
+  display: none;
+}

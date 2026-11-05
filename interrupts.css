@@ -1,0 +1,271 @@
+/* Interrupt inspector — GPL-2.0-or-later. */
+.irq-panel {
+  padding: 20px;
+  background: #f8fafc;
+}
+.irq-panel h3,
+.irq-panel p {
+  margin: 0;
+}
+.irq-heading,
+.irq-toolbar,
+.irq-actions,
+.irq-paging,
+.irq-statline {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.irq-heading {
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+.irq-heading h3 {
+  font-size: 16px;
+}
+.irq-heading p {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.irq-badge {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid #cfdfef;
+  border-radius: 20px;
+  background: #edf5ff;
+  color: #315f96;
+  padding: 5px 10px;
+  font-size: 11px;
+}
+.irq-statline {
+  margin: 0 0 16px;
+  gap: 7px;
+}
+.irq-statline code {
+  background: #101c2c;
+  color: #dbe8f6;
+  padding: 7px 11px;
+  border-radius: 6px;
+  font: 11px var(--mono);
+}
+.irq-statline code.irq-mask-on {
+  color: #ffc97a;
+}
+.irq-workspace {
+  display: grid;
+  grid-template-columns: minmax(450px, 1.3fr) minmax(310px, 1fr);
+  gap: 16px;
+}
+.irq-card {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 16px;
+  min-width: 0;
+}
+.irq-card h3 {
+  font-size: 13px;
+  margin-bottom: 10px;
+}
+.irq-toolbar {
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.irq-toolbar h3 {
+  margin: 0;
+}
+.irq-toolbar select {
+  font-size: 11px;
+}
+.irq-table-wrap {
+  overflow-x: auto;
+}
+.irq-table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 11px;
+}
+.irq-table th {
+  text-align: left;
+  color: #758398;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  padding: 6px;
+  white-space: nowrap;
+}
+.irq-table td {
+  border-top: 1px solid #edf1f6;
+  padding: 6px;
+  white-space: nowrap;
+}
+.irq-table tr.selected td {
+  background: #edf5ff;
+}
+.irq-table tr.irq-running td {
+  background: #e6f8f3;
+}
+.irq-table button {
+  font-size: 10px;
+  padding: 3px 7px;
+}
+.irq-table .irq-name {
+  font-family: var(--mono);
+  border: 0;
+  background: transparent;
+  text-align: left;
+  color: #2865a6;
+}
+.irq-table input[type="checkbox"] {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+}
+.irq-table code {
+  font-size: 10px;
+}
+.irq-state {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #dce3ed;
+  margin-right: 4px;
+}
+.irq-state.pending {
+  background: #e9ad46;
+}
+.irq-state.active {
+  background: #15b897;
+  box-shadow: 0 0 0 3px #e4f7f2;
+}
+.irq-paging {
+  justify-content: flex-end;
+  margin-top: 10px;
+  font-size: 10px;
+  color: var(--muted);
+}
+.irq-paging button {
+  padding: 3px 8px;
+}
+.irq-sidebar {
+  display: grid;
+  gap: 14px;
+  align-content: start;
+}
+.irq-form {
+  display: grid;
+  gap: 10px;
+}
+.irq-form label {
+  display: grid;
+  gap: 4px;
+  font-size: 11px;
+  color: #50667f;
+}
+.irq-form input,
+.irq-form select {
+  font: 12px var(--mono);
+  width: 100%;
+}
+.irq-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.irq-fields .wide {
+  grid-column: 1 / -1;
+}
+.irq-checkbox {
+  display: flex !important;
+  align-items: center;
+  gap: 7px !important;
+}
+.irq-checkbox input {
+  width: auto;
+}
+.irq-help {
+  font-size: 11px;
+  color: #758398;
+  margin-top: 9px !important;
+  line-height: 1.6;
+}
+.irq-detail-value {
+  font: 12px var(--mono);
+  color: #357299;
+  margin: 4px 0 10px;
+}
+.irq-actions button {
+  padding: 6px 10px;
+  font-size: 11px;
+}
+.irq-bottom {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-top: 16px;
+}
+.irq-message {
+  margin: 13px 0 0 !important;
+  font-size: 12px;
+  padding: 9px 12px;
+  border-radius: 6px;
+  color: #256d59;
+  background: #eaf8f2;
+}
+.irq-message:empty {
+  display: none;
+}
+.irq-message.error {
+  color: #a24336;
+  background: #fff0ed;
+}
+.irq-note {
+  margin-top: 15px !important;
+  padding: 11px 13px;
+  border-left: 3px solid #afc2d9;
+  background: #f0f4f8;
+  font-size: 11px;
+  color: #64778c;
+}
+.irq-events {
+  font: 10px/1.6 var(--mono);
+  max-height: 120px;
+  overflow-y: auto;
+  padding: 9px 12px;
+  background: #101c2c;
+  color: #c6d7ec;
+  border-radius: 6px;
+  white-space: pre-wrap;
+  margin: 10px 0 0;
+}
+.irq-empty {
+  font-size: 12px;
+  color: var(--muted);
+  padding: 18px 0;
+}
+@media (max-width: 1100px) {
+  .irq-workspace {
+    grid-template-columns: 1fr;
+  }
+  .irq-sidebar {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+@media (max-width: 700px) {
+  .irq-panel {
+    padding: 12px;
+  }
+  .irq-sidebar,
+  .irq-bottom {
+    grid-template-columns: 1fr;
+  }
+  .irq-card {
+    padding: 12px;
+  }
+  .irq-table {
+    min-width: 500px;
+  }
+}

@@ -1,0 +1,6 @@
+# Depurador ICDI das placas Tiva (EK-TM4C1294XL e EK-TM4C123GXL), USB 1cbe:00fd.
+# uaccess: o usuário logado pode usar a placa sem sudo (gravar pelo navegador e abrir a serial).
+# ID_MM_DEVICE_IGNORE: o ModemManager não mexe na porta serial da placa.
+# Instalar em /etc/udev/rules.d/ e recarregar: sudo udevadm control --reload-rules && sudo udevadm trigger
+SUBSYSTEM=="usb", ATTR{idVendor}=="1cbe", ATTR{idProduct}=="00fd", TAG+="uaccess", ENV{ID_MM_DEVICE_IGNORE}="1"
+SUBSYSTEM=="tty", ATTRS{idVendor}=="1cbe", ATTRS{idProduct}=="00fd", TAG+="uaccess", ENV{ID_MM_DEVICE_IGNORE}="1"
