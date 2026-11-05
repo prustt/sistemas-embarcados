@@ -249,3 +249,27 @@
     height: 45vh;
   }
 }
+
+/* exemplo e programa atual */
+.placa-rotulo {
+  font-size: 12px;
+  font-weight: 600;
+}
+.placa-programa select {
+  min-width: 0;
+  max-width: 100%;
+}
+.placa-link {
+  border: 0;
+  background: none;
+  padding: 4px 2px;
+  color: var(--ink);
+  text-decoration: underline;
+  font-size: 12px;
+}
+.placa-link:hover {
+  background: none;
+}
+.placa-programa-info {
+  flex-basis: 100%;
+}

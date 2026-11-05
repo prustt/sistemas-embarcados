@@ -124,6 +124,26 @@
       this.info = el("span", "placa-info");
       conn.append(this.connectBtn, this.disconnectBtn, this.info);
 
+      // exemplo e programa atual, para não precisar trocar de aba
+      const prog = el("div", "placa-row placa-programa");
+      this.exemplos = el("select");
+      this.exemplos.id = "placaExemplos";
+      this.exemplos.setAttribute("aria-label", "Exemplo");
+      const editar = el("button", "placa-link", "Editar código");
+      editar.type = "button";
+      editar.onclick = () => this.callbacks.editar?.();
+      this.programaInfo = el("span", "placa-info placa-programa-info");
+      prog.append(
+        el("label", "placa-rotulo", "Exemplo"),
+        this.exemplos,
+        this._button("Carregar", () => {
+          this.callbacks.carregar?.(this.exemplos.value);
+          this.atualizarPrograma();
+        }),
+        editar,
+        this.programaInfo,
+      );
+
       const flash = el("div", "placa-row");
       this.flashBtn = this._button("⚡ Build e gravar", () => this.flash(), "primary");
       this.progress = el("progress", "placa-progress");
@@ -207,7 +227,30 @@
       serial.append(sh, this.terminal, send);
 
       grid.append(live, cpu, serial);
-      this.host.append(head, conn, flash, run, this.message, grid);
+      this.host.append(head, conn, prog, flash, run, this.message, grid);
+    }
+
+    // lista de exemplos do micro atual e o que vai ser gravado (vem do app.js)
+    atualizarPrograma() {
+      const lista = this.callbacks.exemplos?.() || [];
+      const chaves = lista.map((e) => e.key).join();
+      if (chaves !== this.chavesExemplos) {
+        this.chavesExemplos = chaves;
+        this.exemplos.replaceChildren(
+          ...lista.map((e) => {
+            const o = el("option", "", e.name);
+            o.value = e.key;
+            return o;
+          }),
+        );
+      }
+      const atual = this.callbacks.exemploAtual?.();
+      if (atual && lista.some((e) => e.key === atual)) this.exemplos.value = atual;
+      const p = this.callbacks.programa?.();
+      if (p)
+        this.programaInfo.textContent =
+          "Vai para a placa: " + p.nome + " · " + p.entrada +
+          (p.bytes ? " · " + p.bytes + " bytes no último Build" : " · o Build é feito ao gravar");
     }
 
     configureDevice() {
@@ -301,6 +344,7 @@
           "A placa conectada não é " + this.lab.device.name + ". Troque o micro selecionado no topo ou conecte a placa certa.",
         );
       const result = this.callbacks.build();
+      this.atualizarPrograma();
       // O monitor não pode ler a placa no meio da gravação.
       this.monitoring = false;
       while (this.looping) await new Promise((r) => setTimeout(r, 20));

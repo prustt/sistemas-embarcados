@@ -261,6 +261,7 @@ function showWorkspace(name, refresh = true) {
     button.classList.toggle("active", selected);
     button.setAttribute("aria-selected", String(selected));
   });
+  if (name === "placa") placaPanel?.atualizarPrograma();
   if (refresh && lab && debug) render();
 }
 function initializeLaboratory() {
@@ -321,6 +322,23 @@ function initializeLaboratory() {
       return LabBoardImage.build(lab, project);
     },
     resolve: (expression) => debug.resolveAddress(expression),
+    exemplos: () =>
+      Object.entries(examples || {}).map(([key, ex]) => ({ key, name: ex.name })),
+    exemploAtual: () => $("examples").value,
+    carregar: (key) => {
+      $("examples").value = key;
+      $("loadExample").click();
+    },
+    programa: () =>
+      project && {
+      nome: project.name,
+      entrada: project.entryFile,
+      bytes: built && !dirty ? lab.code.length : 0,
+    },
+    editar: () => {
+      showWorkspace("bench");
+      document.querySelector(".editor-panel")?.scrollIntoView({ block: "start" });
+    },
   });
   instalacaoPanel = new LabInstalacaoPanel($("instalacaoPanel"));
 }
@@ -419,6 +437,7 @@ function configureDevice() {
     o.value = key;
     $("examples").append(o);
   }
+  placaPanel?.atualizarPrograma();
   const pins = d.ports.flatMap((p, i) => p.pins.map((b) => ({ p: i, b })));
   channels = [
     0,
