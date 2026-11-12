@@ -6,6 +6,14 @@ Site: https://prustt.github.io/sistemas-embarcados/
 
 Projeto de aluno, **não é um site oficial da UTFPR**.
 
+## Bugs e melhorias
+
+- [Relatar bug](https://github.com/prustt/sistemas-embarcados/issues/new?template=bug.yml)
+- [Sugerir melhoria](https://github.com/prustt/sistemas-embarcados/issues/new?template=melhoria.yml)
+- [Ver todos os registros](https://github.com/prustt/sistemas-embarcados/issues)
+
+É preciso entrar com a conta do GitHub; só os colaboradores do repositório podem registrar.
+
 - Simulador com depurador, analisador lógico, GPIO, NVIC e árvore de clock para 5 micros (STM32F411, STM32F103, STM32F407, TM4C123GH6PM, TM4C1294NCPDT).
 - Botão **↓ .bin + .hex**.
 - Aba **Startup**: arquivos de inicialização dos 5 micros, em GNU (GCC) e Keil (ARMASM).
