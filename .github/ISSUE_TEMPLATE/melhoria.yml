@@ -1,0 +1,25 @@
+name: Sugerir melhoria
+description: Uma ideia de recurso, exemplo ou ajuste para a disciplina.
+title: "[Melhoria] "
+labels: ["melhoria"]
+body:
+  - type: textarea
+    id: proposta
+    attributes:
+      label: O que você propõe?
+    validations:
+      required: true
+  - type: textarea
+    id: motivo
+    attributes:
+      label: Por quê? Em que aula, laboratório ou situação ajudaria?
+  - type: input
+    id: micro
+    attributes:
+      label: Micro ou placa relacionada (se houver)
+      placeholder: TI · TM4C1294NCPDT
+  - type: input
+    id: navegador
+    attributes:
+      label: Navegador e sistema (se for algo de tela ou de conexão)
+      placeholder: Chrome 142 · Windows 11

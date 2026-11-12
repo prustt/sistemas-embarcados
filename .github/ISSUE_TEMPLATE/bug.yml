@@ -1,0 +1,40 @@
+name: Relatar bug
+description: Algo no site não funcionou como deveria.
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: textarea
+    id: descricao
+    attributes:
+      label: O que aconteceu?
+      description: Descreva o problema e, se tiver, a mensagem de erro que apareceu.
+    validations:
+      required: true
+  - type: textarea
+    id: passos
+    attributes:
+      label: Como reproduzir
+      description: Passo a passo até o erro (aba, exemplo carregado, botões clicados).
+      placeholder: |
+        1. Micro TI · TM4C1294NCPDT, exemplo 08
+        2. Aba Placa real → Conectar placa
+        3. ...
+  - type: textarea
+    id: esperado
+    attributes:
+      label: O que era esperado?
+  - type: input
+    id: micro
+    attributes:
+      label: Micro selecionado
+      placeholder: TI · TM4C1294NCPDT
+  - type: input
+    id: placa
+    attributes:
+      label: Placa usada (se usou a aba Placa real)
+      placeholder: EK-TM4C1294XL
+  - type: input
+    id: navegador
+    attributes:
+      label: Navegador e sistema
+      placeholder: Chrome 142 · Windows 11
