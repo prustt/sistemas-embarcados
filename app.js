@@ -17,6 +17,7 @@ let boardPanel,
   startupPanel,
   placaPanel,
   instalacaoPanel,
+  feedbackPanel,
   restoringSettings = false;
 let activeWorkspace = "bench";
 let running = false,
@@ -254,7 +255,7 @@ function restoreLaboratoryDefaults() {
 }
 function showWorkspace(name, refresh = true) {
   activeWorkspace = name;
-  for (const item of ["bench", "board", "clock", "interrupts", "startup", "placa", "instalacao"])
+  for (const item of ["bench", "board", "clock", "interrupts", "startup", "placa", "instalacao", "feedback"])
     $(item + "Panel").hidden = item !== name;
   document.querySelectorAll("[data-workspace]").forEach((button) => {
     const selected = button.dataset.workspace === name;
@@ -341,6 +342,9 @@ function initializeLaboratory() {
     },
   });
   instalacaoPanel = new LabInstalacaoPanel($("instalacaoPanel"));
+  feedbackPanel = new LabFeedbackPanel($("feedbackPanel"), {
+    micro: () => $("device").selectedOptions[0]?.textContent.trim(),
+  });
 }
 document
   .querySelectorAll("[data-workspace]")

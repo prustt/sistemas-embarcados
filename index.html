@@ -12,6 +12,7 @@
     <link href="startup.css" rel="stylesheet" />
     <link href="placa.css" rel="stylesheet" />
     <link href="instalacao.css" rel="stylesheet" />
+    <link href="feedback.css" rel="stylesheet" />
     <link href="utfpr.css" rel="stylesheet" />
   </head>
   <body>
@@ -193,6 +194,15 @@
           data-workspace="instalacao"
         >
           ⚙ Instalação
+        </button>
+        <button
+          id="tabFeedback"
+          role="tab"
+          aria-selected="false"
+          aria-controls="feedbackPanel"
+          data-workspace="feedback"
+        >
+          ✎ Bugs e melhorias
         </button>
       </div>
       <div id="benchPanel" role="tabpanel" aria-labelledby="tabBench">
@@ -696,6 +706,13 @@ Comandos: help, regs, print R0, mem endereço [bytes], set R0 valor, break ender
         aria-labelledby="tabInstalacao"
         hidden
       ></section>
+      <section
+        id="feedbackPanel"
+        class="workbench-panel"
+        role="tabpanel"
+        aria-labelledby="tabFeedback"
+        hidden
+      ></section>
       <footer>
         <span>
           Projeto salvo neste navegador · execução local em WebAssembly
@@ -934,6 +951,7 @@ Comandos: help, regs, print R0, mem endereço [bytes], set R0 valor, break ender
     <script src="placa-imagem.js"></script>
     <script src="placa-ui.js"></script>
     <script src="instalacao-ui.js"></script>
+    <script src="feedback-ui.js"></script>
     <script src="app.js"></script>
   </body>
 </html>
