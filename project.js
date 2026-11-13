@@ -172,6 +172,37 @@
     return [...result].filter((name) => !BAD_KEYS.has(name));
   }
 
+  // cbz/cbnz só saltam para frente, até 126 bytes, e o montador não avisa:
+  // o destino montado tem de ser o endereço do rótulo.
+  function conferirCbz(lab, lines, result) {
+    const enderecos = new Map(
+      result.lineAddresses.map((x) => [x.file + ":" + x.line, x.address]),
+    );
+    for (const item of lines) {
+      const clean = stripComments(item.text)
+        .trim()
+        .replace(/^(?:(?:[A-Za-z_.$][\w.$]*|\d+)\s*:\s*)+/, "");
+      const match = /^(cbn?z)\s+\w+\s*,\s*([A-Za-z_.$][\w.$]*)$/i.exec(clean);
+      if (!match || !Object.hasOwn(result.symbols, match[2])) continue;
+      const instruction = lab.byAddr.get(
+        enderecos.get(item.file + ":" + item.line),
+      );
+      if (!instruction || !/^cbn?z/i.test(instruction.mnemonic)) continue;
+      const destino = /#(0x[0-9a-f]+|\d+)\s*$/i.exec(instruction.op);
+      if (destino && Number(destino[1]) !== (result.symbols[match[2]] & ~1) >>> 0)
+        throw new Error(
+          item.file +
+            ":" +
+            item.line +
+            ": " +
+            match[1].toLowerCase() +
+            " só salta para frente, até 126 bytes; para " +
+            match[2] +
+            " use cmp e beq/bne.",
+        );
+    }
+  }
+
   function instructionCount(line) {
     let clean = stripComments(line).trim();
     clean = clean.replace(/^(?:(?:[A-Za-z_.$][\w.$]*|\d+)\s*:\s*)+/, "");
@@ -355,13 +386,14 @@
             " Use o código de máquina para breakpoints e execução até endereço.",
         });
       }
+      if (result.exactMapping) conferirCbz(lab, flattened.lines, result);
       this.lastBuild = result;
       return result;
     }
 
     _mapSource(lab, lines, result) {
       const base = lab.device ? lab.device.flashBase : 0x08000000;
-      let prefix = "__cortex_lab_source_";
+      let prefix = "__fonte_lab_";
       while (result.source.includes(prefix)) prefix += "x";
       const records = [];
       const probe = [];

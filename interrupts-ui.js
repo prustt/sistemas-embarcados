@@ -132,7 +132,7 @@
           this._button("Carregar exemplo IRQ0", () => {
             this.callbacks.onDemo();
             this._message(
-              "Clique Executar para instalar o vetor na SRAM e habilitar IRQ0. Depois use Disparar na linha IRQ 0 ou configure a ligação virtual PB0 → IRQ0.",
+              "Clique Executar: o programa instala o vetor na SRAM e habilita a IRQ0, e o gerador em PB0 dispara a IRQ0 a cada subida (ligação PB0 → IRQ0). Para disparar à mão, use Disparar na linha IRQ 0.",
             );
           }),
         );

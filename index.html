@@ -5,15 +5,15 @@
     <meta content="width=device-width,initial-scale=1" name="viewport" />
     <meta content="#231F20" name="theme-color" />
     <title>Sistemas Embarcados · ELF74</title>
-    <link href="style.css" rel="stylesheet" />
-    <link href="workbench.css" rel="stylesheet" />
-    <link href="board.css" rel="stylesheet" />
-    <link href="interrupts.css" rel="stylesheet" />
-    <link href="startup.css" rel="stylesheet" />
-    <link href="placa.css" rel="stylesheet" />
-    <link href="instalacao.css" rel="stylesheet" />
-    <link href="feedback.css" rel="stylesheet" />
-    <link href="utfpr.css" rel="stylesheet" />
+    <link href="style.css?v=202611130731" rel="stylesheet" />
+    <link href="workbench.css?v=202611130731" rel="stylesheet" />
+    <link href="board.css?v=202611130731" rel="stylesheet" />
+    <link href="interrupts.css?v=202611130731" rel="stylesheet" />
+    <link href="startup.css?v=202611130731" rel="stylesheet" />
+    <link href="placa.css?v=202611130731" rel="stylesheet" />
+    <link href="instalacao.css?v=202611130731" rel="stylesheet" />
+    <link href="feedback.css?v=202611130731" rel="stylesheet" />
+    <link href="utfpr.css?v=202611130731" rel="stylesheet" />
   </head>
   <body>
     <header>
@@ -372,7 +372,7 @@
             <div class="pin-legend">
               <span>
                 <i class="in-dot"> </i>
-                Entrada: clique para alternar
+                Entrada: clique alterna · botão direito solta · ↑/↓ pull
               </span>
               <span>
                 <i class="out-dot"> </i>
@@ -510,7 +510,7 @@
           </div>
           <div class="bottomcontent terminal" hidden="" id="terminalPanel">
             <div class="terminaltop">
-              <span> UART virtual · RXNE / TXE · transferência por byte </span>
+              <span> UART · RXNE / TXE · linha 8N1 nos pinos TX/RX </span>
               <button id="clearTerminal">Limpar saída</button>
             </div>
             <pre aria-live="polite" id="terminalOutput"></pre>
@@ -529,8 +529,9 @@
               <button class="primary" type="submit">Enviar</button>
             </form>
             <small>
-              Use o exemplo 03 e clique Executar. SR: 0x40004400 · DR:
-              0x40004404. Não simula temporização elétrica de UART.
+              Execute e digite em RX → Enviar; o eco volta aqui. SR: 0x40004400 ·
+              DR: 0x40004404. No analisador, TX e RX mostram a linha 8N1 (sem
+              baud rate real).
             </small>
           </div>
           <div class="bottomcontent" hidden="" id="eventsPanel">
@@ -641,8 +642,15 @@
           <div class="bottomcontent build-grid" hidden="" id="buildPanel">
             <section>
               <div class="tracehead">
-                <h3>Build output</h3>
-                <button id="exportHex">↓ Intel HEX</button>
+                <h3>Relatório do build</h3>
+                <span class="build-downloads">
+                  <button id="reportBin" title="Baixa o binário da Flash">
+                    ↓ .bin
+                  </button>
+                  <button id="exportHex" title="Baixa o arquivo Intel HEX">
+                    ↓ .hex
+                  </button>
+                </span>
               </div>
               <pre id="buildOutput">Aguardando montagem…</pre>
             </section>
@@ -929,29 +937,29 @@ Comandos: help, regs, print R0, mem endereço [bytes], set R0 valor, break ender
         </div>
       </form>
     </dialog>
-    <script src="vendor/unicorn_arm.js"></script>
-    <script src="vendor/keystone.js"></script>
-    <script src="vendor/capstone.js"></script>
-    <script src="devices.js"></script>
-    <script src="nvic.js"></script>
-    <script src="core.js"></script>
-    <script src="examples.js"></script>
-    <script src="debugger.js"></script>
-    <script src="project.js"></script>
-    <script src="pinouts.js"></script>
-    <script src="clocks.js"></script>
-    <script src="clock-ui.js"></script>
-    <script src="board.js"></script>
-    <script src="interrupts-ui.js"></script>
-    <script src="zip.js"></script>
-    <script src="startups.js"></script>
-    <script src="startup-ui.js"></script>
-    <script src="placa-icdi.js"></script>
-    <script src="placa-cdc.js"></script>
-    <script src="placa-imagem.js"></script>
-    <script src="placa-ui.js"></script>
-    <script src="instalacao-ui.js"></script>
-    <script src="feedback-ui.js"></script>
-    <script src="app.js"></script>
+    <script src="vendor/unicorn_arm.js?v=202611130731"></script>
+    <script src="vendor/keystone.js?v=202611130731"></script>
+    <script src="vendor/capstone.js?v=202611130731"></script>
+    <script src="devices.js?v=202611130731"></script>
+    <script src="nvic.js?v=202611130731"></script>
+    <script src="core.js?v=202611130731"></script>
+    <script src="examples.js?v=202611130731"></script>
+    <script src="debugger.js?v=202611130731"></script>
+    <script src="project.js?v=202611130731"></script>
+    <script src="pinouts.js?v=202611130731"></script>
+    <script src="clocks.js?v=202611130731"></script>
+    <script src="clock-ui.js?v=202611130731"></script>
+    <script src="board.js?v=202611130731"></script>
+    <script src="interrupts-ui.js?v=202611130731"></script>
+    <script src="zip.js?v=202611130731"></script>
+    <script src="startups.js?v=202611130731"></script>
+    <script src="startup-ui.js?v=202611130731"></script>
+    <script src="placa-icdi.js?v=202611130731"></script>
+    <script src="placa-cdc.js?v=202611130731"></script>
+    <script src="placa-imagem.js?v=202611130731"></script>
+    <script src="placa-ui.js?v=202611130731"></script>
+    <script src="instalacao-ui.js?v=202611130731"></script>
+    <script src="feedback-ui.js?v=202611130731"></script>
+    <script src="app.js?v=202611130731"></script>
   </body>
 </html>

@@ -1946,6 +1946,17 @@ h2 {
   font: 11px/20px var(--mono);
   margin: 10px 0;
 }
+.build-grid pre#buildOutput {
+  max-height: 340px;
+}
+.build-grid pre.falhou {
+  color: #ffb3ba;
+  border-left: 3px solid #ff8591;
+}
+.build-downloads {
+  display: flex;
+  gap: 6px;
+}
 .build-grid .inlineform {
   margin-bottom: 0;
 }

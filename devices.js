@@ -17,22 +17,26 @@
     ),
   });
   const stmUart = {
-    name: "USART2 · modelo de dados",
+    name: "USART2",
     kind: "stm32",
     base: 0x40004400,
     dataOffset: 4,
     statusOffset: 0,
+    tx: "PA2",
+    rx: "PA3",
     description:
-      "SR/DR: RXNE bit 5, TXE bit 7; sem baud rate ou sinais elétricos.",
+      "SR/DR: RXNE bit 5, TC bit 6, TXE bit 7; linha 8N1 em PA2/PA3, sem baud rate real.",
   };
   const tivaUart = {
-    name: "UART0 · modelo de dados",
+    name: "UART0",
     kind: "tiva",
     base: 0x4000c000,
     dataOffset: 0,
     statusOffset: 0x18,
+    tx: "PA1",
+    rx: "PA0",
     description:
-      "DR/FR: RXFE bit 4, TXFF bit 5, TXFE bit 7; sem baud rate ou FIFO temporal.",
+      "DR/FR: BUSY bit 3, RXFE bit 4, TXFF bit 5, TXFE bit 7; linha 8N1 em PA1/PA0, sem FIFO nem baud rate real.",
   };
   // Clocks: memória RW para o programa ligar os clocks como na placa real.
   // resetValues: offset -> valor no reset (flags de pronto já ligadas).

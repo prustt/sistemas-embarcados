@@ -12,6 +12,12 @@
   const RAM = 0x20000000;
   const GPIO = 0x40020000;
   const UART = 0x40004400;
+  // Linha serial nos pinos TX/RX: quadro 8N1 (10 bits) com 4 passos por bit.
+  const PASSOS_BIT = 4;
+  const QUADRO = 10 * PASSOS_BIT;
+  // Mensagens do Keystone no console (ex.: fixup fora do alcance); o host
+  // passa LAB.printErr ao criar o módulo do montador.
+  const saidaMontador = [];
   const hex = (value, digits = 8) =>
     (value >>> 0).toString(16).toUpperCase().padStart(digits, "0");
   const reg = (name, offset, field, access = "RW", description = "") => ({
@@ -23,7 +29,13 @@
   });
   const GPIO_REGISTERS = {
     stm32f1: [
-      reg("CRL", 0x00, "crl", "RW", "MODE/CNF: quatro bits por pino 0–7"),
+      reg(
+        "CRL",
+        0x00,
+        "crl",
+        "RW",
+        "MODE/CNF: quatro bits por pino 0–7; 0x8 = entrada com pull (ODR escolhe)",
+      ),
       reg("CRH", 0x04, "crh", "RW", "MODE/CNF: quatro bits por pino 8–15"),
       reg("IDR", 0x08, "idr", "RO", "Níveis digitais dos pinos"),
       reg("ODR", 0x0c, "odr", "RW", "Latch de saída"),
@@ -58,7 +70,13 @@
         "RW",
         "Armazenado; velocidade elétrica não modelada",
       ),
-      reg("PUPDR", 0x0c, "pupdr", "RW", "Armazenado; resistores não modelados"),
+      reg(
+        "PUPDR",
+        0x0c,
+        "pupdr",
+        "RW",
+        "01 pull-up, 10 pull-down: nível da entrada sem nada ligado",
+      ),
       reg("IDR", 0x10, "idr", "RO", "Níveis digitais dos pinos"),
       reg("ODR", 0x14, "odr", "RW", "Latch de saída"),
       reg(
@@ -132,14 +150,14 @@
         0x510,
         "pur",
         "RW",
-        "Armazenado; pull-up elétrico não modelado",
+        "1 liga o pull-up (limpa o bit em PDR): entrada solta lê 1",
       ),
       reg(
         "PDR",
         0x514,
         "pdr",
         "RW",
-        "Armazenado; pull-down elétrico não modelado",
+        "1 liga o pull-down (limpa o bit em PUR): entrada solta lê 0",
       ),
       reg(
         "SLR",
@@ -179,6 +197,7 @@
       this.device = DEVICES.stm32f411ce;
       this.model = this.device.model;
       this.manual = this.device.ports.map(() => 0);
+      this.driven = this.device.ports.map(() => 0);
       this.generator = {
         enabled: false,
         port: 1,
@@ -206,6 +225,7 @@
       this.byAddr = new Map();
       this.breakpoints.clear();
       this.manual = device.ports.map(() => 0);
+      this.driven = device.ports.map(() => 0);
       this.generator.enabled = false;
       this.wire.enabled = false;
       this.reset();
@@ -345,6 +365,14 @@
       this.t = 0;
       this.rx = [];
       this.tx = "";
+      this.linha = { ativa: false, tx: [], rx: [], fimTx: 0, fimRx: 0 };
+      this.pinosUart = ["tx", "rx"]
+        .map((lado) => {
+          const m = /^P([A-Z])(\d+)$/.exec(device.uart[lado] || "");
+          const index = m ? device.ports.findIndex((p) => p.name === m[1]) : -1;
+          return index < 0 ? null : { lado, index, bit: Number(m[2]) };
+        })
+        .filter(Boolean);
       this.events = [];
       this.trace = [];
       this.stopReason = "Pronto";
@@ -432,10 +460,12 @@
         .split("\n")
         .map((line) => line.replace(/@.*$/, "").replace(/\/\/.*$/, ""))
         .join("\n");
-      const result = this.assembler.asm(clean, this.device.flashBase);
+      const result = this._montar(clean);
       if (result.failed || !result.mc.length) {
         throw Error(
-          "Assembly inválido. Verifique sintaxe GNU/Thumb, rótulos e operandos. " +
+          "Assembly inválido" +
+            (result.failed ? " (" + this._assemblerMessage() + ")" : "") +
+            ". Verifique sintaxe GNU/Thumb, rótulos e operandos. " +
             (result.count
               ? "Instruções processadas: " + result.count
               : "Nenhuma instrução montada."),
@@ -444,6 +474,104 @@
       if (result.mc.length > this.device.flashSize)
         throw Error("Programa excede a Flash do dispositivo.");
       return this.loadBinary(result.mc);
+    }
+
+    // Monta com o Keystone. Também conta como falha: o montador travar
+    // (ex.: .text ou .align 99) ou escrever "error:" no console sem errno
+    // (ex.: literal do ldr =x longe demais, que sairia com o registrador errado).
+    _montar(texto) {
+      saidaMontador.length = 0;
+      this._falha = null;
+      let result;
+      try {
+        result = this.assembler.asm(texto, this.device.flashBase);
+      } catch {
+        this._falha = { message: "diretiva ou valor não aceito pelo montador" };
+        return { failed: true, mc: [], count: 0 };
+      }
+      const erro = saidaMontador.findIndex((linha) => /^error:/.test(linha));
+      if (!result.failed && erro >= 0) {
+        this._falha = {
+          message: /out of range|fixup/.test(saidaMontador[erro])
+            ? "valor ou destino fora do alcance da instrução"
+            : "diretiva ou sintaxe não aceita pelo montador",
+          linha: saidaMontador[erro + 1],
+        };
+        return { failed: true, mc: [], count: result.count };
+      }
+      return result;
+    }
+
+    _assemblerMessage() {
+      if (this._falha) return this._falha.message;
+      let text = "";
+      try {
+        text = this.k.strerror(this.assembler.errno());
+      } catch {}
+      const code = (/KS_ERR_ASM_(\w+)/.exec(text) || [])[1];
+      if (!code) return "erro de montagem";
+      const grupos = [
+        [/^MNEMONICFAIL$/, "instrução desconhecida"],
+        [/^INVALIDOPERAND$/, "operando inválido para esta instrução"],
+        [/^SYMBOL_MISSING$/, "rótulo ou símbolo não definido"],
+        [/^SYMBOL_REDEFINED$/, "rótulo definido mais de uma vez"],
+        [/^(MISSINGFEATURE|INSN_UNSUPPORTED)$/, "instrução não aceita pelo montador neste modo"],
+        [/^(STAT_TOKEN|DIRECTIVE_UNKNOWN|DIRECTIVE_INVALID)$/, "diretiva ou instrução desconhecida"],
+        [/^DIRECTIVE_VALUE_RANGE$/, "valor fora da faixa da diretiva"],
+        [/^FIXUP_INVALID$/, "destino fora do alcance da instrução"],
+        [/^ESC_/, "sequência de escape inválida no texto"],
+        [/^MACRO_/, "macro inválida"],
+        [/^(DIRECTIVE_|EXPR_|RPAREN|TOKEN_INVALID|LABEL_INVALID|SYMBOL_MODIFIER|UNSUPPORTED|VARIANT_INVALID)/, "sintaxe inválida"],
+      ];
+      const grupo = grupos.find(([re]) => re.test(code));
+      return grupo ? grupo[1] : "erro de montagem (" + code + ")";
+    }
+
+    // Acha a primeira linha recusada pelo montador: monta prefixos do fonte
+    // (busca binária) com os rótulos ainda não vistos no fim.
+    locateError(lines) {
+      const clean = lines.map((line) =>
+        line.replace(/@.*$/, "").replace(/\/\/.*$/, ""),
+      );
+      const names = clean.map((line) => {
+        const found = [];
+        let rest = line.trim();
+        let match;
+        while ((match = /^([A-Za-z_.$][\w.$]*|\d+)\s*:\s*/.exec(rest))) {
+          found.push(match[1]);
+          rest = rest.slice(match[0].length);
+        }
+        const definition =
+          /^\.(?:equ|equiv|set)\s+([A-Za-z_.$][\w.$]*)\s*,/i.exec(rest) ||
+          /^([A-Za-z_.$][\w.$]*)\s*=/.exec(rest);
+        if (definition) found.push(definition[1]);
+        return found;
+      });
+      const fails = (count) => {
+        const defined = new Set(names.slice(0, count).flat());
+        const later = [...new Set(names.slice(count).flat())].filter(
+          (name) => !defined.has(name),
+        );
+        const text = clean
+          .slice(0, count)
+          .concat(later.map((name) => name + ":"))
+          .join("\n");
+        return this._montar(text).failed;
+      };
+      if (!fails(clean.length)) return null;
+      // O Keystone repete no console a linha do erro de fixup.
+      const eco = this._falha && this._falha.linha;
+      const achada = eco ? clean.indexOf(eco) : -1;
+      if (achada >= 0) return { index: achada, message: this._falha.message };
+      let low = 0;
+      let high = clean.length;
+      while (high - low > 1) {
+        const middle = (low + high) >> 1;
+        if (fails(middle)) high = middle;
+        else low = middle;
+      }
+      if (!fails(high)) return null;
+      return { index: high - 1, message: this._assemblerMessage() };
     }
 
     loadBinary(bytes) {
@@ -541,10 +669,14 @@
         return;
       }
       const uart = this.device.uart;
+      if (address >= uart.base && address < uart.base + 0x1000)
+        this.linha.ativa = true;
       if (address === uart.base + uart.dataOffset) {
-        this.tx += String.fromCharCode(Number(BigInt(value) & 255n));
+        const byte = Number(BigInt(value) & 255n);
+        this.tx += String.fromCharCode(byte);
         this.tx = this.tx.slice(-16000);
-        this.log("UART TX 0x" + hex(Number(BigInt(value) & 255n), 2));
+        this.log("UART TX 0x" + hex(byte, 2));
+        this._quadroTx(byte);
         this._registerCache.delete(address);
         return;
       }
@@ -575,6 +707,9 @@
         if (register.field === "odr") port.odr &= definition.mask;
         if (this.device.gpioKind === "tiva" && register.field !== "pctl")
           port[register.field] &= definition.mask;
+        // Tiva: ligar o pull-up desliga o pull-down do mesmo pino e vice-versa.
+        if (register.field === "pur") port.pdr &= ~port.pur;
+        if (register.field === "pdr") port.pur &= ~port.pdr;
       }
     }
 
@@ -586,10 +721,43 @@
       }
     }
 
+    // TX com um byte no registrador de deslocamento e um esperando (sem FIFO):
+    // cheio = TXE 0 (STM32) / TXFF 1 (Tiva); ocupado = TC 0 / BUSY 1.
     _uartStatus() {
-      return this.device.uart.kind === "tiva"
-        ? 0x80 | (this.rx.length ? 0 : 0x10)
-        : 0xc0 | (this.rx.length ? 0x20 : 0);
+      const linha = this.linha;
+      const cheio = linha.tx.some((q) => q.inicio > this.t);
+      const ocupado = this.t < linha.fimTx;
+      const rx = this.rx.length > 0;
+      if (this.device.uart.kind === "tiva")
+        return (cheio ? 0x20 : 0x80) | (ocupado ? 0x08 : 0) | (rx ? 0 : 0x10);
+      return (cheio ? 0 : 0x80) | (ocupado ? 0 : 0x40) | (rx ? 0x20 : 0);
+    }
+
+    // Byte escrito no DR: entra na fila do TX. Escrever com o byte anterior
+    // ainda esperando o substitui, como no chip.
+    _quadroTx(byte) {
+      const linha = this.linha;
+      linha.tx = linha.tx.filter((q) => q.inicio + QUADRO > this.t);
+      const esperando = linha.tx.find((q) => q.inicio > this.t);
+      if (esperando) {
+        esperando.byte = byte;
+        return;
+      }
+      // A amostra do passo atual já foi tirada: o start bit sai no próximo.
+      const inicio = Math.max(this.t + 1, linha.fimTx);
+      linha.tx.push({ inicio, byte });
+      linha.fimTx = inicio + QUADRO;
+    }
+
+    // Nível da linha agora: start (0), 8 bits do LSB ao MSB, stop (1); parada = 1.
+    _nivelUart(lado) {
+      for (const q of this.linha[lado]) {
+        const bit = Math.floor((this.t - q.inicio) / PASSOS_BIT);
+        if (bit < 0) break;
+        if (bit < 10)
+          return bit === 0 ? 0 : bit === 9 ? 1 : (q.byte >> (bit - 1)) & 1;
+      }
+      return 1;
     }
 
     _refreshRead(address, size, consumeUart) {
@@ -616,6 +784,8 @@
         this.put(clock.base + clock.cfgr, (cfgr & ~0xc) | ((cfgr & 3) << 2));
       }
       const uart = this.device.uart;
+      if (consumeUart && address < uart.base + 0x1000 && address + size > uart.base)
+        this.linha.ativa = true;
       const dataAddress = uart.base + uart.dataOffset;
       if (address <= dataAddress && address + size > dataAddress) {
         const value = this.rx.length
@@ -648,8 +818,33 @@
       }
     }
 
+    // Nível do resistor de pull de uma entrada: 1, 0 ou null (sem pull).
+    pullLevel(index, bit) {
+      const port = this.ports[index];
+      const mask = 1 << bit;
+      if (this.device.gpioKind === "tiva") {
+        if (port.pur & mask) return 1;
+        return port.pdr & mask ? 0 : null;
+      }
+      if (this.device.gpioKind === "stm32f1") {
+        const config =
+          ((bit < 8 ? port.crl : port.crh) >>> ((bit % 8) * 4)) & 15;
+        if (config !== 8) return null;
+        return port.odr & mask ? 1 : 0;
+      }
+      const pull = (port.pupdr >>> (2 * bit)) & 3;
+      return pull === 1 ? 1 : pull === 2 ? 0 : null;
+    }
+
     sync() {
+      const linha = this.linha;
+      // RX: o byte fica disponível para o programa no fim do quadro.
+      while (linha.rx.length && linha.rx[0].inicio + QUADRO <= this.t)
+        this.rx.push(linha.rx.shift().byte);
       const inputs = this.manual.map((value) => value || 0);
+      // Pinos com algo ligado (clique, componente, gerador, ligação):
+      // valem o nível externo; os outros ficam com o pull do programa.
+      const driven = this.driven.map((value) => value || 0);
       const generator = this.generator;
       if (generator.enabled && this.device.ports[generator.port]) {
         const high =
@@ -657,6 +852,7 @@
         inputs[generator.port] =
           (inputs[generator.port] & ~(1 << generator.pin)) |
           (high ? 1 << generator.pin : 0);
+        driven[generator.port] |= 1 << generator.pin;
       }
       const calculatePins = (index) => {
         const port = this.ports[index];
@@ -666,8 +862,22 @@
           const mode = this.pinMode(index, bit);
           if (mode < 4) normalizedMode |= mode << (2 * bit);
           if (mode === 1) pins |= port.odr & (1 << bit);
-          if (mode === 0) pins |= inputs[index] & (1 << bit);
+          if (mode === 0) {
+            const pull =
+              driven[index] & (1 << bit) ? null : this.pullLevel(index, bit);
+            if (pull === null) pins |= inputs[index] & (1 << bit);
+            else pins |= pull << bit;
+          }
         }
+        // Depois que a UART é usada, TX/RX mostram a linha serial; um GPIO de
+        // saída no mesmo pino ganha, e no RX vale também o que estiver ligado.
+        if (linha.ativa)
+          for (const u of this.pinosUart) {
+            const mask = 1 << u.bit;
+            if (u.index !== index || this.pinMode(index, u.bit) === 1) continue;
+            if (u.lado === "rx" && driven[index] & mask) continue;
+            pins = (pins & ~mask) | (this._nivelUart(u.lado) << u.bit);
+          }
         if (this.device.gpioKind !== "stm32f4")
           port.moder = normalizedMode >>> 0;
         port.pins = pins & this.device.ports[index].mask;
@@ -680,6 +890,7 @@
         const high = (this.ports[wire.from].pins >>> wire.fp) & 1;
         inputs[wire.to] =
           (inputs[wire.to] & ~(1 << wire.tp)) | (high << wire.tp);
+        driven[wire.to] |= 1 << wire.tp;
         calculatePins(wire.to);
       }
       for (let index = 0; index < this.ports.length; index++) {
@@ -727,8 +938,8 @@
       this.log("GPIO: escrita 0x" + hex(value) + " em 0x" + hex(address));
     }
 
-    // Configure the modeled GPIO registers. Pull resistors are stored, not
-    // resolved electrically: virtual components explicitly drive their idle level.
+    // Configura os registradores de GPIO modelados. O pull vale para a entrada
+    // sem nada ligado; componentes virtuais dirigem o próprio nível de repouso.
     configurePin(index, bit, mode, pull = "none") {
       const definition = this.device.ports[index];
       if (
@@ -907,17 +1118,24 @@
           }
           if (!handled) {
             this.halted = true;
-            this.stopReason =
-              "Exceção do motor Unicorn (código " +
-              event.number +
-              ") não traduzido em exceção ARM. PC 0x" +
-              hex(event.pc) +
-              ".";
+            this.stopReason = this._faultText(event);
           }
         }
       } catch (error) {
         this.halted = true;
-        this.stopReason = "Falha em 0x" + hex(pc) + ": " + String(error);
+        const instruction = this.byAddr.get(pc);
+        this.stopReason = String(error).includes("UC_ERR_INSN_INVALID")
+          ? "Instrução " +
+            (instruction ? instruction.mnemonic + " " : "") +
+            "em 0x" +
+            hex(pc) +
+            " não existe no " +
+            this.device.core +
+            (this.model === 8
+              ? " (instruções DSP e de ponto flutuante só no Cortex-M4)."
+              : ".") +
+            " Na placa isso gera UsageFault."
+          : "Falha em 0x" + hex(pc) + ": " + String(error);
         throw Error(this.stopReason);
       }
       this.t++;
@@ -927,21 +1145,88 @@
       return !this.halted;
     }
 
+    _faultText(event) {
+      const at = " em 0x" + hex(event.pc) + ": ";
+      if (event.number === 17)
+        return (
+          "UsageFault NOCP" +
+          at +
+          "instrução de ponto flutuante, mas " +
+          (this.model === 8
+            ? "o " + this.device.core + " não tem FPU."
+            : "a FPU está desligada (CPACR).")
+        );
+      if (event.number === 1)
+        return (
+          "UsageFault UNDEFINSTR" +
+          at +
+          "instrução não definida para o " +
+          this.device.core +
+          "."
+        );
+      if (event.number === 18)
+        return (
+          "UsageFault INVSTATE" +
+          at +
+          "desvio para endereço sem o bit 0 (estado Thumb)."
+        );
+      return (
+        "Exceção do motor Unicorn (código " +
+        event.number +
+        ") não traduzida em exceção ARM. PC 0x" +
+        hex(event.pc) +
+        "."
+      );
+    }
+
     input(index, bit, high) {
       const definition = this.device.ports[index];
       if (!definition || !(definition.mask & (1 << bit)))
         throw Error("Pino não disponível neste encapsulamento.");
       this.manual[index] =
         (this.manual[index] & ~(1 << bit)) | (high ? 1 << bit : 0);
+      this.driven[index] |= 1 << bit;
       this.sync();
       this.sample();
       this.log("P" + definition.name + bit + " entrada = " + Number(high));
     }
 
-    serial(text) {
-      for (const byte of new TextEncoder().encode(text)) this.rx.push(byte);
+    // Mantém o nível manual atual como externo (componente ligado no pino).
+    hold(index, bit) {
+      if (!this.device.ports[index] || this.driven[index] & (1 << bit)) return;
+      this.driven[index] |= 1 << bit;
       this.sync();
+      this.sample();
+    }
+
+    // Solta o pino: sem nada ligado ele volta ao pull configurado (ou 0).
+    release(index, bit) {
+      const definition = this.device.ports[index];
+      if (!definition || !(definition.mask & (1 << bit))) return;
+      this.manual[index] &= ~(1 << bit);
+      this.driven[index] &= ~(1 << bit);
+      this.sync();
+      this.sample();
+      this.log("P" + definition.name + bit + " solto");
+    }
+
+    // Texto do Terminal: os bytes chegam pelo RX um quadro depois do outro.
+    serial(text) {
+      const linha = this.linha;
+      linha.ativa = true;
+      for (const byte of new TextEncoder().encode(text)) {
+        const inicio = Math.max(this.t, linha.fimRx);
+        linha.rx.push({ inicio, byte });
+        linha.fimRx = inicio + QUADRO;
+      }
+      this.sync();
+      this.sample();
       this.log("UART RX: " + JSON.stringify(text));
+    }
+
+    // Bytes do Terminal ainda não lidos pelo programa (na linha ou no DR).
+    get rxPendente() {
+      return this.rx.length + this.linha.rx.length;
     }
 
     registers() {
@@ -983,7 +1268,15 @@
   }
 
   root.LabSimulador = LabSimulador;
-  root.LAB = { FLASH, RAM, GPIO, UART, hex };
+  root.LAB = {
+    FLASH,
+    RAM,
+    GPIO,
+    UART,
+    hex,
+    PASSOS_BIT,
+    printErr: (texto) => saidaMontador.push(String(texto)),
+  };
   if (typeof module !== "undefined")
     module.exports = { LabSimulador, LAB: root.LAB };
 })(typeof globalThis !== "undefined" ? globalThis : this);

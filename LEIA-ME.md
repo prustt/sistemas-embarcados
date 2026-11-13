@@ -18,6 +18,14 @@ O site é só HTML, CSS e JavaScript, sem etapa de build: o GitHub Pages publica
 python3 tools/gerar_startups_js.py
 ```
 
+## Antes de publicar
+
+O GitHub Pages deixa o navegador guardar os arquivos por 10 minutos. Para quem já abriu o site receber a versão nova na hora, marque os arquivos com a versão antes do commit:
+
+```bash
+python3 tools/versao.py
+```
+
 ## Rodar localmente
 
 Na pasta do projeto:

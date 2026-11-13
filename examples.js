@@ -50,15 +50,26 @@
       uart.kind === "tiva"
         ? "    ldr r1, [r0, #0x18]\n    tst r1, #16\n    bne poll\n"
         : "    ldr r1, [r0]\n    tst r1, #32\n    beq poll\n";
+    const txWait =
+      uart.kind === "tiva"
+        ? "    ldr r1, [r0, #0x18]     @ FR\n" +
+          "    tst r1, #0x20           @ TXFF: FIFO cheia\n" +
+          "    bne putc\n"
+        : "    ldr r1, [r0]            @ SR\n" +
+          "    tst r1, #0x80           @ TXE: pode transmitir\n" +
+          "    beq putc\n";
+    const semGpio = "Este exemplo não usa GPIO: o analisador fica parado. ";
     const header = "@ " + device.name + " · " + device.package + "\n";
 
     const examples = {
       blink: {
         name: "01 · Contador nas portas",
         description:
-          "PA0–PA3 contam em binário. Configuração e endereços de GPIO são os do " +
+          "PA0–PA3 contam em binário: são os canais 1–4 do analisador e um ciclo 0→F leva 512 passos. Configuração e endereços de GPIO são os do " +
           device.name +
-          ".",
+          ". No simulador o clock do GPIO já vem ligado; na placa é preciso ligá-lo antes.",
+        canais: ["PA0", "PA1", "PA2", "PA3", "PA4", "PB0"],
+        janela: 512,
         code:
           header +
           "@ PA0–PA3: saídas; PUSH/POP preservam a pilha.\n" +
@@ -84,7 +95,10 @@
       mirror: {
         name: "02 · Entrada → saída",
         description:
-          "PB0 é uma entrada; PA0 reflete seu nível. Clique PB0 ou habilite o gerador. Os registradores são específicos do dispositivo.",
+          "PB0 é uma entrada e PA0 copia o nível dela. O gerador de onda quadrada já vem ligado em PB0 (64 passos): o analisador mostra PB0 no canal 1 e PA0 no canal 2, alguns passos atrasado. Para mudar PB0 à mão, desligue “Onda quadrada” (o gerador tem prioridade) e clique PB0.",
+        canais: ["PB0", "PA0", "PA1", "PA2", "PA3", "PB1"],
+        gerador: { pino: "PB0", periodo: 64 },
+        porta: "B",
         code:
           header +
           "@ Copia PB0 para PA0 continuamente.\n" +
@@ -104,9 +118,27 @@
         description:
           "Eco por " +
           uart.name +
-          ". O programa testa " +
+          ". Clique Executar: o programa manda “Eco pronto” no Terminal e o canal 1 (" +
+          uart.tx +
+          ", TX) mostra cada byte como um quadro 8N1 (start 0, 8 bits do LSB ao MSB, stop 1). Depois digite no campo RX e clique Enviar: os bytes chegam pelo canal 2 (" +
+          uart.rx +
+          ", RX) e o programa testa " +
           (uart.kind === "tiva" ? "RXFE em FR" : "RXNE em SR") +
-          ", lê o registrador de dados e devolve os bytes.",
+          ", lê o registrador de dados e devolve cada byte.",
+        canais: [
+          uart.tx,
+          uart.rx,
+          ...["PA0", "PA1", "PA2", "PA3", "PB0", "PB1"].filter(
+            (n) => n !== uart.tx && n !== uart.rx,
+          ),
+        ],
+        aba: "terminal",
+        aviso:
+          "Clique Executar: " +
+          uart.tx +
+          " (TX) e " +
+          uart.rx +
+          " (RX) mostram a linha serial depois que o programa usa a UART.",
         code:
           header +
           "@ " +
@@ -114,16 +146,36 @@
           "\n" +
           preamble +
           address("r0", uart.base) +
+          "    adr r3, texto\n" +
+          "saudacao:\n" +
+          "    ldrb r2, [r3], #1\n" +
+          "    cbz r2, poll\n" +
+          "    bl putc\n" +
+          "    b saudacao\n" +
           "poll:\n" +
           rxPoll +
           `    ldrb r2, [r0, #${uart.dataOffset}]\n` +
+          "    bl putc\n" +
+          "    b poll\n\n" +
+          "putc:\n" +
+          txWait +
           `    strb r2, [r0, #${uart.dataOffset}]\n` +
-          "    b poll\n",
+          "    bx lr\n\n" +
+          "    .align 2\n" +
+          "texto:\n" +
+          '    .asciz "Eco pronto\\r\\n"\n',
       },
       stack: {
         name: "04 · Sub-rotina e pilha",
         description:
-          "PUSH preserva R4 e LR; a função soma R0 e R1, grava 12 na SRAM e retorna via POP PC.",
+          semGpio +
+          "BL chama soma; PUSH guarda R4 = 42 e LR na pilha; soma devolve 7 + 5 = 12 em R0 e POP {r4, pc} retorna. O principal grava 12 em 0x20000000 e para no BKPT #0. Use Passo (F11) para ver a pilha cheia: no BKPT ela já voltou ao topo.",
+        aviso:
+          semGpio +
+          "Veja R0, R4, SP e LR nos registradores e a pilha na aba Memória & pilhas.",
+        canais: [],
+        watches: ["R0", "R1", "R4", "SP", "LR", "mem32(0x20000000)"],
+        aba: "memory",
         code:
           header +
           preamble +
@@ -145,7 +197,11 @@
       interrupt: {
         name: "07 · NVIC / interrupção GPIO",
         description:
-          "IRQ0 alterna PA0 e incrementa o contador em SRAM+0x100. Dispare IRQ0 na aba NVIC ou ligue PB0 a IRQ0 na borda de subida. Vetor configurado na SRAM.",
+          "IRQ0 alterna PA0 e incrementa o contador em SRAM+0x100; o vetor é configurado na SRAM. Já vêm ligados o gerador em PB0 (64 passos) e a ligação PB0 → IRQ0 na subida: cada subida de PB0 (canal 1) dispara a IRQ0 e PA0 (canal 2) muda. Para disparar à mão, desligue “Onda quadrada” e clique PB0 ou use Disparar na aba Interrupções.",
+        canais: ["PB0", "PA0", "PA1", "PA2", "PA3", "PB1"],
+        gerador: { pino: "PB0", periodo: 64 },
+        ligacao: { pino: "PB0", irq: 0, borda: "rise" },
+        porta: "B",
         code:
           header +
           "@ IRQ0: PA0 alterna; contador em SRAM + 0x100.\n" +
@@ -177,8 +233,16 @@
       fpu: {
         name: "05 · Ponto flutuante · M4F",
         description:
-          "Requer Cortex-M4F. S0=1,5; S1=2,5; S2=4; S3=6. O resultado 6,0 é gravado na SRAM em IEEE 754.",
+          semGpio +
+          "Requer Cortex-M4F. S0 = 1,5; S1 = 2,5; S2 = 4; S3 = 6. O resultado 6,0 é gravado em 0x20000000 em IEEE 754 (0x40C00000).",
         requiresModel: 9,
+        aviso:
+          semGpio +
+          "Veja S0–S3 (Ponto flutuante) e mem32(0x20000000) = 0x40C00000 = 6,0.",
+        canais: [],
+        watches: ["S0", "S1", "S2", "S3", "mem32(0x20000000)"],
+        aba: "debug",
+        painelFpu: true,
         code:
           header +
           "@ Requer Cortex-M4F; M3 interrompe por instrução/FPU indisponível.\n" +
@@ -194,8 +258,13 @@
       dsp: {
         name: "06 · DSP / saturação · M4",
         description:
-          "Requer M4. SADD16 soma duas metades de 16 bits; SSAT limita 300 ao intervalo assinado de 8 bits: 127.",
+          semGpio +
+          "Requer M4. SADD16 soma duas metades de 16 bits (R0 = 0x0018000D); SSAT limita 300 ao intervalo assinado de 8 bits: R4 = 127 e a flag Q liga. RBIT dá R5 = 0xFE000000 e CLZ dá R6 = 25.",
         requiresModel: 9,
+        aviso: semGpio + "Veja R0, R4 (flag Q = 1), R5 e R6 nos registradores.",
+        canais: [],
+        watches: ["R0", "R4", "R5", "R6", "XPSR"],
+        aba: "debug",
         code:
           header +
           preamble +
@@ -221,7 +290,11 @@
     return {
       name: "08 · Placa EK-TM4C1294XL · LEDs e serial",
       description:
-        "Roda igual no simulador e na placa: liga os clocks no SYSCTL, conta de 0 a F nos LEDs D1–D4 e manda “ELF74 N” pela UART0 (115200 8N1, porta serial do depurador). Com USR_SW1 (PJ0) pressionado o contador para. No simulador o pull-up não é modelado e PJ0 começa em 0 (pressionado): ponha PJ0 em 1 para contar.",
+        "Roda igual no simulador e na placa: liga os clocks no SYSCTL, conta de 0 a F nos LEDs D1–D4 e manda “ELF74 N” pela UART0 (115200 8N1, porta serial do depurador; veja o Terminal). O analisador mostra D1–D4 (PN1, PN0, PF4, PF0) e as chaves PJ0/PJ1. PJ0 tem pull-up: solto lê 1 e o contador anda. Para simular USR_SW1 pressionado, clique PJ0 (porta J) para 0; o botão direito solta o pino. Para ver os quadros da UART0, escolha PA1 (TX) num canal e use a janela de 512 passos.",
+      canais: ["PN1", "PN0", "PF4", "PF0", "PJ0", "PJ1"],
+      janela: 8192,
+      porta: "N",
+      aba: "terminal",
       code:
         "@ " +
         device.name +

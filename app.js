@@ -35,7 +35,10 @@ let triggerArmed = false,
   editAction = null;
 let channels = [],
   fileMode = "add",
-  followRequested = false;
+  followRequested = false,
+  avisoScope = "",
+  rotaAutomatica = null,
+  pinosBancada = [];
 const STORAGE = "elf74-projeto";
 const kb = (n) => (n / 1024).toLocaleString("pt-BR") + " KiB";
 const pinName = (p, b) => "P" + (lab?.device.ports[p]?.name || "?") + b;
@@ -82,18 +85,37 @@ function download(name, data, type = "text/plain") {
 function downloadZip(name, entries) {
   saveFile(name, new Blob([LabZip.make(entries)], { type: "application/zip" }));
 }
+function nomeArquivo() {
+  return (
+    project.name
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^\w.-]+/g, "-")
+      .replace(/^-|-$/g, "") || "projeto"
+  );
+}
+function nomeBase() {
+  return nomeArquivo() + "-" + lab.device.id;
+}
+// Depois de um Build com erro (ou do fonte alterado) o binário na memória é velho.
+function baixarBin() {
+  if (!lab?.code || dirty) throw Error("Faça um Build sem erros primeiro.");
+  download(nomeBase() + ".bin", lab.code, "application/octet-stream");
+}
+function baixarHex() {
+  if (!lab?.code || dirty) throw Error("Faça um Build sem erros primeiro.");
+  download(
+    nomeBase() + ".hex",
+    LabProject.toIntelHex(lab.code, lab.device.flashBase),
+  );
+}
 function exportBuildFiles() {
   buildProject();
-  const base =
-    project.name.replace(/[^\w.-]+/g, "-").replace(/^-|-$/g, "") +
-    "-" +
-    lab.device.id;
-  const files = [
-    { name: base + ".bin", data: lab.code },
-    { name: base + ".hex", data: LabProject.toIntelHex(lab.code, lab.device.flashBase) },
-  ];
-  download(files[0].name, files[0].data, "application/octet-stream");
-  setTimeout(() => download(files[1].name, files[1].data), 300);
+  baixarBin();
+  setTimeout(guard(baixarHex), 300);
+}
+function pinoPorNome(nome) {
+  return lab.device.accessiblePins.find((p) => p.name === nome);
 }
 function syncEditor() {
   if (project && project.files[project.activeFile] !== $("source").value)
@@ -211,7 +233,7 @@ function switchFile(name, followLine = null) {
   $("lines").scrollTop = $("source").scrollTop;
   save();
 }
-function loadProject(p) {
+function loadProject(p, abrirRelatorio = true) {
   if (!DEVICES[p.deviceId])
     throw Error("Dispositivo desconhecido no projeto: " + p.deviceId);
   pause();
@@ -226,6 +248,7 @@ function loadProject(p) {
   built = null;
   prevRegs = {};
   port = 0;
+  avisoScope = "";
   memAddr = lab.device.ramBase;
   $("memAddress").value = "0x" + h(memAddr);
   $("source").value = project.files[project.activeFile];
@@ -240,7 +263,7 @@ function loadProject(p) {
     restoringSettings = false;
   }
   cleanCapture();
-  buildProject();
+  buildProject(abrirRelatorio);
 }
 function laboratorySettings() {
   return {
@@ -251,7 +274,25 @@ function laboratorySettings() {
 }
 function restoreLaboratoryDefaults() {
   boardPanel?.afterReset();
+  marcarBancada();
   interruptPanel?.afterReset();
+}
+// Botões e chaves da aba Chip & conexões dirigem o pino (o pull não vale ali);
+// um componente removido solta o pino.
+function marcarBancada() {
+  if (!lab || !boardPanel?.profile) return;
+  const nomes = boardPanel.profile.components
+    .filter((c) => c.type !== "led")
+    .map((c) => c.pin);
+  for (const nome of pinosBancada) {
+    const p = pinoPorNome(nome);
+    if (p && !nomes.includes(nome)) lab.release(p.port, p.bit);
+  }
+  for (const nome of nomes) {
+    const p = pinoPorNome(nome);
+    if (p) lab.hold(p.port, p.bit);
+  }
+  pinosBancada = nomes;
 }
 function showWorkspace(name, refresh = true) {
   activeWorkspace = name;
@@ -267,7 +308,10 @@ function showWorkspace(name, refresh = true) {
 }
 function initializeLaboratory() {
   boardPanel = new LabBoard($("boardPanel"), lab, {
-    onChange: () => render(),
+    onChange: () => {
+      marcarBancada();
+      render();
+    },
     onPause: pause,
     onSave: () => {
       if (!restoringSettings) save();
@@ -283,6 +327,9 @@ function initializeLaboratory() {
     onDemo: () => {
       $("examples").value = "mirror";
       $("loadExample").click();
+      // O botão virtual comanda PB0; o gerador teria prioridade sobre ele.
+      $("genEnabled").checked = false;
+      updateGenerator();
       showWorkspace("board");
     },
   });
@@ -320,7 +367,18 @@ function initializeLaboratory() {
   placaPanel = new LabPlacaPanel($("placaPanel"), lab, {
     build: () => {
       buildProject();
-      return LabBoardImage.build(lab, project);
+      const imagem = LabBoardImage.build(lab, project);
+      $("buildOutput").textContent +=
+        "\nimagem da placa: " +
+        imagem.image.length +
+        " bytes · vetores em 0x" +
+        h(imagem.base) +
+        " · programa em 0x" +
+        h(imagem.codeBase) +
+        " (" +
+        imagem.codeSize +
+        " bytes)";
+      return imagem;
     },
     resolve: (expression) => debug.resolveAddress(expression),
     exemplos: () =>
@@ -364,10 +422,135 @@ function deviceSymbols(sourceSymbols = {}) {
   symbols.SRAM_BASE = lab.device.ramBase;
   return symbols;
 }
-function buildProject() {
+function arquivosDoBuild() {
+  try {
+    return [...new Set(project.sourceForBuild().lines.map((l) => l.file))];
+  } catch {
+    return [project.entryFile];
+  }
+}
+function conferirHex(texto, total) {
+  const linhas = texto.trim().split("\n");
+  let dados = 0,
+    registros = 0,
+    soma = true;
+  for (const linha of linhas) {
+    const bytes = linha
+      .slice(1)
+      .match(/../g)
+      .map((x) => parseInt(x, 16));
+    if (bytes.reduce((a, b) => a + b, 0) & 255) soma = false;
+    if (bytes[3] === 0) {
+      dados += bytes[0];
+      registros++;
+    }
+  }
+  return { linhas: linhas.length, registros, ok: soma && dados === total };
+}
+function cabecalhoBuild(arquivos) {
+  const d = lab.device;
+  return [
+    "Build do alvo '" + d.name + "' (" + d.core + " · " + d.package + ")",
+    "Projeto: " + project.name + " · entrada " + project.entryFile,
+    ...arquivos.map((nome) => "montando " + nome + "..."),
+  ];
+}
+function relatorioBuild(start, arquivos) {
+  const d = lab.device,
+    tamanho = lab.code.length,
+    base = nomeBase();
+  const hex = LabProject.toIntelHex(lab.code, d.flashBase);
+  const conferido = conferirHex(hex, tamanho);
+  const ram = Object.entries(built.symbols || {}).filter(
+    ([, v]) => v >= d.ramBase && v < d.ramBase + d.ramSize,
+  );
+  const avisos = (built.diagnostics || []).filter(
+    (x) => x.level === "warning",
+  );
+  const infos = (built.diagnostics || []).filter((x) => x.level !== "warning");
+  const fora = Object.keys(project.files).filter((n) => !arquivos.includes(n));
+  return [
+    ...cabecalhoBuild(arquivos),
+    ...(fora.length ? ["fora do build (sem .include): " + fora.join(", ")] : []),
+    "gerando a imagem (link)... Flash em 0x" + h(d.flashBase),
+    "Tamanho do programa: Flash = " +
+      tamanho +
+      " bytes (0x" +
+      h(d.flashBase) +
+      "–0x" +
+      h(d.flashBase + tamanho - 1) +
+      ", " +
+      ((tamanho * 100) / d.flashSize < 0.01
+        ? "< 0,01"
+        : ((tamanho * 100) / d.flashSize).toLocaleString("pt-BR", {
+            maximumFractionDigits: 2,
+          })) +
+      "% de " +
+      kb(d.flashSize) +
+      ")",
+    "RAM: " +
+      (ram.length
+        ? "símbolos na SRAM " +
+          ram.map(([n, v]) => n + " = 0x" + h(v)).join(", ")
+        : "nenhum dado estático (o montador gera só a imagem da Flash)") +
+      "; pilha (MSP) começa em 0x" +
+      h(d.ramBase + d.ramSize) +
+      ", topo da SRAM de " +
+      kb(d.ramSize),
+    "Itens na desmontagem (inclui dados): " + built.listing.length,
+    "criando " + base + ".bin... " + tamanho + " bytes",
+    "criando " +
+      base +
+      ".hex... " +
+      conferido.linhas +
+      " registros Intel HEX (" +
+      conferido.registros +
+      " de dados) · " +
+      (conferido.ok ? "conferido" : "FALHA NA CONFERÊNCIA"),
+    ".bin/.hex = imagem do simulador, sem tabela de vetores; para gravar na placa use a aba Placa real",
+    ...infos.map((x) => "info: " + (x.message || x)),
+    ...avisos.map((x) => "aviso: " + (x.message || x)),
+    '"' +
+      project.name +
+      '" - 0 erro(s), ' +
+      avisos.length +
+      " aviso(s).",
+    "Tempo do build: " + Math.round(performance.now() - start) + " ms",
+  ].join("\n");
+}
+// Erro de montagem: aponta arquivo, linha e o texto da linha.
+function erroDeBuild(error) {
+  const message = error.message || String(error);
+  const doProjeto = /^(.+?):(\d+): (.*)$/.exec(message);
+  if (doProjeto && Object.hasOwn(project.files, doProjeto[1])) {
+    const [, file, linha, resto] = doProjeto;
+    return {
+      message: file + "(" + linha + "): erro: " + resto,
+      file,
+      line: +linha,
+      text: (project.files[file].split("\n")[linha - 1] || "").trim(),
+    };
+  }
+  if (!message.startsWith("Assembly inválido")) return { message };
+  try {
+    const lines = project.sourceForBuild().lines;
+    const found = lab.locateError(lines.map((l) => l.text));
+    const item = found && lines[found.index];
+    if (item)
+      return {
+        message: item.file + "(" + item.line + "): erro: " + found.message,
+        file: item.file,
+        line: item.line,
+        text: item.text.trim(),
+      };
+  } catch {}
+  return { message };
+}
+function buildProject(abrirRelatorio = true) {
   pause();
   syncEditor();
   const start = performance.now();
+  const arquivos = arquivosDoBuild();
   try {
     built = project.build(lab);
     debug.reset();
@@ -391,29 +574,12 @@ function buildProject() {
       "reset",
     ])
       $(id).disabled = false;
-    const diagnostics = (built.diagnostics || []).map((d) =>
-      typeof d === "string" ? d : d.message || JSON.stringify(d),
-    );
-    $("buildOutput").textContent = [
-      "Build target: " + lab.device.name,
-      "Projeto: " + project.name + " · entrada " + project.entryFile,
-      Object.keys(project.files).length + " arquivo(s) no projeto",
-      "Flash: 0x" +
-        h(lab.device.flashBase) +
-        " · " +
-        lab.code.length +
-        " bytes",
-      "Instruções na desmontagem: " + built.listing.length,
-      "Fonte: " +
-        (built.exactMapping
-          ? "mapeamento verificado"
-          : "mapeamento indisponível"),
-      ...diagnostics,
-      "Concluído em " + Math.round(performance.now() - start) + " ms.",
-    ].join("\n");
+    $("buildOutput").textContent = relatorioBuild(start, arquivos);
+    $("buildOutput").classList.remove("falhou");
     renderListing(built.listing);
     renderSourceLines();
     save();
+    if (abrirRelatorio) showBottom("build", false);
     render();
     status(
       "Build concluído · " + lab.code.length + " bytes · " + lab.device.name,
@@ -422,9 +588,28 @@ function buildProject() {
     dirty = true;
     for (const id of ["run", "step", "stepOver", "stepOut", "runCursor"])
       $(id).disabled = true;
-    $("buildOutput").textContent = "BUILD FALHOU\n" + (error.message || error);
+    const erro = erroDeBuild(error);
+    $("buildOutput").textContent = [
+      ...cabecalhoBuild(arquivos),
+      erro.message,
+      ...(erro.text ? ["    " + erro.line + " | " + erro.text] : []),
+      "Alvo não criado: nenhum .bin ou .hex gerado.",
+      '"' + project.name + '" - 1 erro(s), 0 aviso(s).',
+      "Tempo do build: " + Math.round(performance.now() - start) + " ms",
+    ].join("\n");
+    $("buildOutput").classList.add("falhou");
     showBottom("build");
-    throw error;
+    if (erro.file && Object.hasOwn(project.files, erro.file)) {
+      switchFile(erro.file, erro.line);
+      const linhas = $("source").value.split("\n");
+      let inicio = 0;
+      for (let i = 0; i < erro.line - 1; i++) inicio += linhas[i].length + 1;
+      $("source").setSelectionRange(
+        inicio,
+        inicio + (linhas[erro.line - 1] || "").length,
+      );
+    }
+    throw erro.file ? Error(erro.message + " · " + erro.text) : error;
   }
 }
 function configureDevice() {
@@ -434,11 +619,19 @@ function configureDevice() {
   interruptPanel?.configureDevice();
   startupPanel?.configureDevice();
   placaPanel?.configureDevice();
+  // selectDevice já soltou todos os pinos do micro.
+  pinosBancada = [];
   examples = examplesForDevice(d);
   $("examples").replaceChildren();
   for (const [key, ex] of Object.entries(examples)) {
     const o = element("option", "", ex.name);
     o.value = key;
+    if (ex.requiresModel > d.model) {
+      o.disabled = true;
+      o.textContent += ex.painelFpu
+        ? " (requer FPU · Cortex-M4F)"
+        : " (requer Cortex-M4)";
+    }
     $("examples").append(o);
   }
   placaPanel?.atualizarPrograma();
@@ -527,17 +720,29 @@ function configureDevice() {
   $("terminalPanel").querySelector(".terminaltop span").textContent =
     d.uart.name + " · " + d.uart.description;
   $("terminalPanel").querySelector("small").textContent =
-    "Base 0x" +
+    "Execute e digite em RX → Enviar; o eco volta aqui. Base 0x" +
     h(d.uart.base) +
     " · DR +0x" +
     h(d.uart.dataOffset, 2) +
     " · Status +0x" +
     h(d.uart.statusOffset, 2) +
-    ". Modelo de dados; sem baud rate físico.";
+    ". No analisador, " +
+    d.uart.tx +
+    " (TX) e " +
+    d.uart.rx +
+    " (RX) mostram a linha 8N1 com " +
+    LAB.PASSOS_BIT +
+    " passos por bit (sem baud rate real).";
   $("exampleDescription").textContent =
     "Exemplos adaptados a " +
     d.name +
     ". Carregue um exemplo ou mantenha seus arquivos e ajuste os endereços.";
+}
+function atualizarCanais() {
+  channels.forEach((ch, i) => {
+    const select = $("channelLabels").children[i];
+    if (select) select.value = ch.p * 16 + ch.b;
+  });
 }
 function renderListing(listing) {
   $("disasm").replaceChildren();
@@ -764,9 +969,21 @@ function renderPins() {
     $("pins").replaceChildren();
     $("pins").dataset.profile = key;
     for (let i = 0; i < profile.width; i++) {
+      // Entrada: alterna a partir do nível lido (pode estar em 1 pelo pull-up).
       const b = action("", () => {
-        lab.input(port, i, !((lab.manual[port] >>> i) & 1));
+        const nivel =
+          lab.pinMode(port, i) === 0 ? lab.ports[port].pins : lab.manual[port];
+        lab.input(port, i, !((nivel >>> i) & 1));
         render();
+      });
+      b.oncontextmenu = guard((e) => {
+        e.preventDefault();
+        lab.release(port, i);
+        render();
+        status(
+          pinName(port, i) +
+            " solto: sem nada ligado, a entrada lê o pull do programa (ou 0).",
+        );
       });
       b.append(
         element("b", "", pinName(port, i)),
@@ -776,25 +993,40 @@ function renderPins() {
       $("pins").append(b);
     }
   }
+  const g = lab.generator,
+    w = lab.wire;
   for (let i = 0; i < profile.width; i++) {
     const mode = lab.pinMode(port, i),
       high = (p.pins >>> i) & 1;
+    const externo =
+      (lab.driven[port] >>> i) & 1 ||
+      (g.enabled && g.port === port && g.pin === i) ||
+      (w.enabled && w.to === port && w.tp === i);
+    const pull = mode === 0 && !externo ? lab.pullLevel(port, i) : null;
     const b = $("pins").children[i];
     b.className =
       "pin" +
       (high ? " high" : "") +
       (mode === 1 ? " output" : "") +
       (mode === 4 ? " unavailable" : "");
-    b.disabled = mode !== 0;
+    b.disabled = mode === 1 || mode === 2 || mode === 4;
     b.children[1].textContent = mode === 4 ? "—" : high;
     b.children[2].textContent =
-      ["IN", "OUT", "AF —", "AN —", "N/C"][mode] || "OFF";
+      (["IN", "OUT", "AF —", "AN —", "N/C"][mode] || "OFF") +
+      (pull === 1 ? " ↑" : pull === 0 ? " ↓" : "");
     b.title =
       mode === 4
         ? "Pino não disponível neste encapsulamento"
         : mode === 0
-          ? "Alternar entrada manual; gerador/ligação têm prioridade"
-          : "Configuração definida pelo programa";
+          ? (pull === 1
+              ? "Solto: lê 1 pelo pull-up. "
+              : pull === 0
+                ? "Solto: lê 0 pelo pull-down. "
+                : "") +
+            "Clique alterna o nível externo; botão direito solta o pino. Gerador/ligação têm prioridade"
+          : mode === 3
+            ? "Sem função digital (DEN = 0 ou analógico): o clique guarda o nível externo para quando o programa habilitar a entrada"
+            : "Configuração definida pelo programa";
   }
   for (const b of $("portSelector").children)
     b.classList.toggle("active", +b.dataset.port === port);
@@ -1068,7 +1300,9 @@ function render() {
     renderWatches();
     renderBreakpoints();
   }
-  $("rxBadge").textContent = lab.rx.length ? "(" + lab.rx.length + " RX)" : "";
+  $("rxBadge").textContent = lab.rxPendente
+    ? "(" + lab.rxPendente + " RX)"
+    : "";
   if (!$("terminalPanel").hidden) {
     $("terminalOutput").textContent = new TextDecoder().decode(
       Uint8Array.from(lab.tx, (c) => c.charCodeAt(0)),
@@ -1089,8 +1323,8 @@ function render() {
     }
   }
 }
-function showBottom(name) {
-  showWorkspace("bench", false);
+function showBottom(name, trocarArea = true) {
+  if (trocarArea) showWorkspace("bench", false);
   document
     .querySelectorAll("[data-bottom]")
     .forEach((b) => b.classList.toggle("active", b.dataset.bottom === name));
@@ -1140,7 +1374,8 @@ function drawScope() {
     start = Math.max(0, end - win);
   end = start + win;
   let x = (t) => ((t - start) / win) * (w - 12) + 4;
-  let rowH = (height - 29) / 6;
+  let rowH = (height - 29) / 6,
+    bordas = 0;
   ctx.strokeStyle = "#3b3536";
   ctx.lineWidth = 0.6;
   ctx.fillStyle = "#8f877b";
@@ -1184,6 +1419,7 @@ function drawScope() {
       if (val !== state) {
         ctx.lineTo(x(s.t), val ? y0 : y1);
         state = val;
+        bordas++;
       }
     }
     ctx.lineTo(
@@ -1212,6 +1448,7 @@ function drawScope() {
     ctx.fillStyle = "#f5c663";
     ctx.fillText("▼", x(triggerAt) - 4, 14);
   }
+  if (!bordas) avisoNoScope(ctx, data, start, end, w, height);
   $("scopeRange").textContent =
     Math.round(start) + " → " + Math.round(end) + " passos";
   $("cursorReadout").textContent =
@@ -1221,6 +1458,46 @@ function drawScope() {
         ? `A ${cursors[0]} · clique para posicionar B`
         : "Clique no gráfico: cursores A / B";
   canvas._range = { start, end, w };
+}
+
+// Sem bordas nos 6 canais: diz quais pinos mudaram ou o aviso do exemplo.
+function avisoNoScope(ctx, data, start, end, w, height) {
+  const mudou = lab.ports.map(() => 0);
+  let anterior = null;
+  for (const s of data) {
+    if (s.t > end) break;
+    if (anterior && s.t > start)
+      s.v.forEach((v, p) => (mudou[p] |= v ^ anterior.v[p]));
+    anterior = s;
+  }
+  const ativos = [];
+  mudou.forEach((m, p) => {
+    for (let b = 0; b < 16; b++) if ((m >>> b) & 1) ativos.push(pinName(p, b));
+  });
+  const texto = ativos.length
+    ? "Sem bordas nos 6 canais. Pinos que mudaram: " +
+      ativos.slice(0, 8).join(", ") +
+      (ativos.length > 8 ? "…" : "") +
+      ". Escolha-os nos seletores à esquerda."
+    : avisoScope ||
+      (data.length > 1 ? "Nenhum pino mudou nesta janela." : "");
+  if (!texto) return;
+  ctx.font = "11px system-ui, sans-serif";
+  const linhas = [];
+  let linha = "";
+  for (const palavra of texto.split(" ")) {
+    const teste = linha ? linha + " " + palavra : palavra;
+    if (ctx.measureText(teste).width > w - 60 && linha) {
+      linhas.push(linha);
+      linha = palavra;
+    } else linha = teste;
+  }
+  linhas.push(linha);
+  const top = height / 2 - (linhas.length * 15) / 2 - 6;
+  ctx.fillStyle = "rgba(24, 20, 21, 0.88)";
+  ctx.fillRect(20, top, w - 40, linhas.length * 15 + 12);
+  ctx.fillStyle = "#f4bd61";
+  linhas.forEach((l, i) => ctx.fillText(l, 30, top + 18 + i * 15));
 }
 
 function updateGenerator() {
@@ -1266,7 +1543,7 @@ function exportCSV() {
       (s) => s.t + "," + channels.map((c) => (s.v[c.p] >>> c.b) & 1).join(","),
     )
     .join("\n");
-  download(project.name + "-scope.csv", text, "text/csv");
+  download(nomeBase() + "-scope.csv", text, "text/csv");
 }
 function exportVCD() {
   const data = captureData();
@@ -1292,7 +1569,7 @@ function exportVCD() {
     });
     if (changes.length) text += "#" + row.t + "\n" + changes.join("\n") + "\n";
   }
-  download(project.name + "-scope.vcd", text);
+  download(nomeBase() + "-scope.vcd", text);
 }
 function showFileDialog(mode) {
   if (!project) return;
@@ -1487,7 +1764,7 @@ $("projectName").onchange = guard(() => {
 $("saveProject").onclick = guard(() => {
   save();
   download(
-    project.name + ".elf74.json",
+    nomeArquivo() + ".elf74.json",
     JSON.stringify(project.toJSON(), null, 2),
     "application/json",
   );
@@ -1495,7 +1772,7 @@ $("saveProject").onclick = guard(() => {
 $("newProject").onclick = guard(() => {
   const ex = examples.blink;
   download(
-    project.name + "-backup.elf74.json",
+    nomeArquivo() + "-backup.elf74.json",
     JSON.stringify(project.toJSON(), null, 2),
     "application/json",
   );
@@ -1556,7 +1833,7 @@ $("replaceOne").onclick = () => {
   }
 };
 $("toggleSourceBp").onclick = guard(() => toggleBreakpoint(sourceAddress()));
-$("assemble").onclick = guard(buildProject);
+$("assemble").onclick = guard(() => buildProject());
 $("buildFiles").onclick = guard(exportBuildFiles);
 $("run").onclick = guard(() => startExecution());
 $("step").onclick = guard(singleStep);
@@ -1592,6 +1869,16 @@ $("device").onchange = guard(() => {
 $("loadExample").onclick = guard(() => {
   const key = $("examples").value,
     ex = examples[key];
+  if (ex.requiresModel > lab.model)
+    throw Error(
+      (ex.painelFpu
+        ? "Este exemplo requer FPU (Cortex-M4F); o "
+        : "Este exemplo requer Cortex-M4; o ") +
+        lab.device.name +
+        " é " +
+        lab.device.core +
+        ".",
+    );
   // Preserve an automatic recovery snapshot before replacing the current project.
   try {
     localStorage.setItem(
@@ -1620,25 +1907,75 @@ $("loadExample").onclick = guard(() => {
   );
   $("examples").value = key;
   $("exampleDescription").textContent = ex.description;
-  if (key === "uart") showBottom("terminal");
-  if (key === "mirror") {
-    port = Math.min(1, lab.ports.length - 1);
-    renderPins();
-  }
+  aplicarExemplo(ex);
 });
+// Canais do analisador, estímulo e painéis que o exemplo pede.
+function aplicarExemplo(ex) {
+  (ex.canais || []).slice(0, 6).forEach((nome, i) => {
+    const p = pinoPorNome(nome);
+    if (p) channels[i] = { p: p.port, b: p.bit };
+  });
+  atualizarCanais();
+  $("scopeWindow").value = ex.janela || 512;
+  avisoScope = ex.aviso || "";
+  // Um botão da aba Chip & conexões no pino manda nele; o gerador fica desligado.
+  const g =
+    ex.gerador &&
+    !pinosBancada.includes(ex.gerador.pino) &&
+    pinoPorNome(ex.gerador.pino);
+  if (g) {
+    $("genPin").value = g.port * 16 + g.bit;
+    $("genPeriod").value = ex.gerador.periodo || 64;
+    $("genDuty").value = 50;
+    $("genEnabled").checked = true;
+    document.querySelector("details.stimulus").open = true;
+    updateGenerator();
+  }
+  const r = ex.ligacao && pinoPorNome(ex.ligacao.pino);
+  ligarRota(
+    r
+      ? {
+          port: r.port,
+          bit: r.bit,
+          irq: ex.ligacao.irq,
+          edge: ex.ligacao.borda,
+          enabled: true,
+        }
+      : null,
+  );
+  if (ex.porta)
+    port = Math.max(
+      0,
+      lab.device.ports.findIndex((p) => p.name === ex.porta),
+    );
+  if (ex.watches) {
+    debug.watches = [];
+    for (const expr of ex.watches) debug.addWatch(expr);
+  }
+  if (ex.painelFpu && lab.model === 9) $("fpuRegs").parentElement.open = true;
+  if (ex.aba) showBottom(ex.aba, false);
+  render();
+}
+// Ligação pino → IRQ do exemplo 07; sai quando outro exemplo é carregado.
+function ligarRota(rota) {
+  if (!interruptPanel) return;
+  const perfil = interruptPanel.profile;
+  if (rota) {
+    perfil.route = rota;
+    rotaAutomatica = JSON.stringify(rota);
+  } else if (perfil.route && JSON.stringify(perfil.route) === rotaAutomatica) {
+    perfil.route = null;
+    lab.nvic.clearRoute();
+    if (interruptPanel.routeEnabled) interruptPanel.routeEnabled.checked = false;
+  } else return;
+  interruptPanel.afterReset();
+  save();
+}
 $("downloadAsm").onclick = () =>
   download(project.activeFile, $("source").value);
-$("downloadBin").onclick = guard(() => {
-  if (!lab?.code) throw Error("Faça Build primeiro.");
-  download(project.name + ".bin", lab.code, "application/octet-stream");
-});
-$("exportHex").onclick = guard(() => {
-  if (!lab?.code) throw Error("Faça Build primeiro.");
-  download(
-    project.name + ".hex",
-    LabProject.toIntelHex(lab.code, lab.device.flashBase),
-  );
-});
+$("downloadBin").onclick = guard(baixarBin);
+$("reportBin").onclick = guard(baixarBin);
+$("exportHex").onclick = guard(baixarHex);
 $("importBtn").onclick = () => $("importFile").click();
 $("importFile").onchange = async (e) => {
   const file = e.target.files[0];
@@ -1751,7 +2088,7 @@ $("exportTrace").onclick = () => {
         .map((v) => '"' + String(v).replaceAll('"', '""') + '"')
         .join(","),
     );
-  download(project.name + "-trace.csv", rows.join("\n"), "text/csv");
+  download(nomeBase() + "-trace.csv", rows.join("\n"), "text/csv");
 };
 $("commandForm").onsubmit = (e) => {
   e.preventDefault();
@@ -1916,7 +2253,7 @@ document.addEventListener("keydown", (e) => {
   if (!lab || document.querySelector("dialog[open]")) return;
   const bindings = {
     F5: () => startExecution(),
-    F7: buildProject,
+    F7: () => buildProject(),
     F9: () => toggleBreakpoint(sourceAddress()),
     F10: () =>
       e.ctrlKey
@@ -1936,7 +2273,7 @@ configureReference();
     if (!bin.ok) throw Error("Motor WebAssembly indisponível.");
     const [uc, ks, cs] = await Promise.all([
       MUnicorn({ wasmBinary: new Uint8Array(await bin.arrayBuffer()) }),
-      MKeystone(),
+      MKeystone({ printErr: LAB.printErr }),
       MCapstone(),
     ]);
     lab = new LabSimulador(uc, ks, cs);
@@ -1961,7 +2298,19 @@ configureReference();
     }
     if (!DEVICES[p.deviceId])
       throw Error("Perfil de microcontrolador não reconhecido no projeto.");
-    loadProject(p);
+    try {
+      loadProject(p, false);
+    } catch (error) {
+      // Erro no fonte salvo: o relatório mostra a linha e o editor fica livre.
+      status(error.message || String(error), true);
+    }
+    // Projeto salvo que é um exemplo: volta com os canais e o estímulo dele.
+    const salvo = Object.entries(examples).find(([, e]) => e.name === p.name);
+    if (salvo && !(salvo[1].requiresModel > lab.model)) {
+      $("examples").value = salvo[0];
+      $("exampleDescription").textContent = salvo[1].description;
+      guard(aplicarExemplo)(salvo[1]);
+    }
     document.querySelector("main").inert = false;
     document.querySelector("main").setAttribute("aria-busy", "false");
   } catch (error) {
